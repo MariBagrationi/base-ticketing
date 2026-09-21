@@ -1,0 +1,30 @@
+@host = http://localhost:5222
+
+### Step 1: Get a nonce
+GET {{host}}/auth/nonce
+Accept: application/json
+
+### Step 2: Sign the SIWE message with your wallet, then verify
+# Build a SIWE message using the nonce from step 1, sign it with MetaMask
+# or a script (see below), then POST the message + signature here.
+#
+# Example ethers.js script to produce a valid signature:
+#
+#   import { Wallet } from "ethers";
+#   const wallet = new Wallet("<PRIVATE_KEY>");
+#   const message = `localhost wants you to sign in with your Ethereum account:\n${wallet.address}\n\nSign in to TixFlow\n\nURI: http://localhost:5222\nVersion: 1\nChain ID: 8453\nNonce: <NONCE_FROM_STEP_1>\nIssued At: ${new Date().toISOString()}`;
+#   const signature = await wallet.signMessage(message);
+#   console.log(JSON.stringify({ message, signature }));
+
+POST {{host}}/auth/verify
+Content-Type: application/json
+
+{
+  "message": "localhost wants you to sign in with your Ethereum account:\n0xYOUR_WALLET_ADDRESS\n\nSign in to TixFlow\n\nURI: http://localhost:5222\nVersion: 1\nChain ID: 8453\nNonce: PASTE_NONCE_HERE\nIssued At: 2026-09-21T12:00:00.000Z",
+  "signature": "0xPASTE_SIGNATURE_HERE"
+}
+
+### Step 3: Access protected endpoint with JWT
+# Paste the token from step 2 into the Authorization header
+GET {{host}}/auth/me
+Authorization: Bearer PASTE_JWT_HERE

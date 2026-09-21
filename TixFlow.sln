@@ -1,0 +1,115 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{A1B2C3D4-0001-0000-0000-000000000001}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "backend", "backend", "{A1B2C3D4-0002-0000-0000-000000000001}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "contracts", "contracts", "{A1B2C3D4-0003-0000-0000-000000000001}"
+	ProjectSection(SolutionItems) = preProject
+		src\contracts\foundry.toml = src\contracts\foundry.toml
+		src\contracts\src\EventTicket.sol = src\contracts\src\EventTicket.sol
+		src\contracts\src\PriceCappedResale.sol = src\contracts\src\PriceCappedResale.sol
+		src\contracts\test\EventTicket.t.sol = src\contracts\test\EventTicket.t.sol
+		src\contracts\script\Deploy.s.sol = src\contracts\script\Deploy.s.sol
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "frontend", "frontend", "{A1B2C3D4-0004-0000-0000-000000000001}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TixFlow.Api", "src\backend\TixFlow\TixFlow.Api\TixFlow.Api.csproj", "{B1000001-0000-0000-0000-000000000001}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TixFlow.Domain", "src\backend\TixFlow\TixFlow.Domain\TixFlow.Domain.csproj", "{B1000002-0000-0000-0000-000000000001}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TixFlow.Infrastructure", "src\backend\TixFlow\TixFlow.Infrastructure\TixFlow.Infrastructure.csproj", "{B1000003-0000-0000-0000-000000000001}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TixFlow.Workers", "src\backend\TixFlow\TixFlow.Workers\TixFlow.Workers.csproj", "{B1000004-0000-0000-0000-000000000001}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TixFlow.Tests", "src\backend\TixFlow\TixFlow.Tests\TixFlow.Tests.csproj", "{7626426A-92CC-4566-A4F0-6C180FF3526B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B1000001-0000-0000-0000-000000000001}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B1000001-0000-0000-0000-000000000001}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B1000001-0000-0000-0000-000000000001}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B1000001-0000-0000-0000-000000000001}.Debug|x64.Build.0 = Debug|Any CPU
+		{B1000001-0000-0000-0000-000000000001}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B1000001-0000-0000-0000-000000000001}.Debug|x86.Build.0 = Debug|Any CPU
+		{B1000001-0000-0000-0000-000000000001}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B1000001-0000-0000-0000-000000000001}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B1000001-0000-0000-0000-000000000001}.Release|x64.ActiveCfg = Release|Any CPU
+		{B1000001-0000-0000-0000-000000000001}.Release|x64.Build.0 = Release|Any CPU
+		{B1000001-0000-0000-0000-000000000001}.Release|x86.ActiveCfg = Release|Any CPU
+		{B1000001-0000-0000-0000-000000000001}.Release|x86.Build.0 = Release|Any CPU
+		{B1000002-0000-0000-0000-000000000001}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B1000002-0000-0000-0000-000000000001}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B1000002-0000-0000-0000-000000000001}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B1000002-0000-0000-0000-000000000001}.Debug|x64.Build.0 = Debug|Any CPU
+		{B1000002-0000-0000-0000-000000000001}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B1000002-0000-0000-0000-000000000001}.Debug|x86.Build.0 = Debug|Any CPU
+		{B1000002-0000-0000-0000-000000000001}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B1000002-0000-0000-0000-000000000001}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B1000002-0000-0000-0000-000000000001}.Release|x64.ActiveCfg = Release|Any CPU
+		{B1000002-0000-0000-0000-000000000001}.Release|x64.Build.0 = Release|Any CPU
+		{B1000002-0000-0000-0000-000000000001}.Release|x86.ActiveCfg = Release|Any CPU
+		{B1000002-0000-0000-0000-000000000001}.Release|x86.Build.0 = Release|Any CPU
+		{B1000003-0000-0000-0000-000000000001}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B1000003-0000-0000-0000-000000000001}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B1000003-0000-0000-0000-000000000001}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B1000003-0000-0000-0000-000000000001}.Debug|x64.Build.0 = Debug|Any CPU
+		{B1000003-0000-0000-0000-000000000001}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B1000003-0000-0000-0000-000000000001}.Debug|x86.Build.0 = Debug|Any CPU
+		{B1000003-0000-0000-0000-000000000001}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B1000003-0000-0000-0000-000000000001}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B1000003-0000-0000-0000-000000000001}.Release|x64.ActiveCfg = Release|Any CPU
+		{B1000003-0000-0000-0000-000000000001}.Release|x64.Build.0 = Release|Any CPU
+		{B1000003-0000-0000-0000-000000000001}.Release|x86.ActiveCfg = Release|Any CPU
+		{B1000003-0000-0000-0000-000000000001}.Release|x86.Build.0 = Release|Any CPU
+		{B1000004-0000-0000-0000-000000000001}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B1000004-0000-0000-0000-000000000001}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B1000004-0000-0000-0000-000000000001}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B1000004-0000-0000-0000-000000000001}.Debug|x64.Build.0 = Debug|Any CPU
+		{B1000004-0000-0000-0000-000000000001}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B1000004-0000-0000-0000-000000000001}.Debug|x86.Build.0 = Debug|Any CPU
+		{B1000004-0000-0000-0000-000000000001}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B1000004-0000-0000-0000-000000000001}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B1000004-0000-0000-0000-000000000001}.Release|x64.ActiveCfg = Release|Any CPU
+		{B1000004-0000-0000-0000-000000000001}.Release|x64.Build.0 = Release|Any CPU
+		{B1000004-0000-0000-0000-000000000001}.Release|x86.ActiveCfg = Release|Any CPU
+		{B1000004-0000-0000-0000-000000000001}.Release|x86.Build.0 = Release|Any CPU
+		{7626426A-92CC-4566-A4F0-6C180FF3526B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7626426A-92CC-4566-A4F0-6C180FF3526B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7626426A-92CC-4566-A4F0-6C180FF3526B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{7626426A-92CC-4566-A4F0-6C180FF3526B}.Debug|x64.Build.0 = Debug|Any CPU
+		{7626426A-92CC-4566-A4F0-6C180FF3526B}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{7626426A-92CC-4566-A4F0-6C180FF3526B}.Debug|x86.Build.0 = Debug|Any CPU
+		{7626426A-92CC-4566-A4F0-6C180FF3526B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7626426A-92CC-4566-A4F0-6C180FF3526B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7626426A-92CC-4566-A4F0-6C180FF3526B}.Release|x64.ActiveCfg = Release|Any CPU
+		{7626426A-92CC-4566-A4F0-6C180FF3526B}.Release|x64.Build.0 = Release|Any CPU
+		{7626426A-92CC-4566-A4F0-6C180FF3526B}.Release|x86.ActiveCfg = Release|Any CPU
+		{7626426A-92CC-4566-A4F0-6C180FF3526B}.Release|x86.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{A1B2C3D4-0002-0000-0000-000000000001} = {A1B2C3D4-0001-0000-0000-000000000001}
+		{A1B2C3D4-0003-0000-0000-000000000001} = {A1B2C3D4-0001-0000-0000-000000000001}
+		{A1B2C3D4-0004-0000-0000-000000000001} = {A1B2C3D4-0001-0000-0000-000000000001}
+		{B1000001-0000-0000-0000-000000000001} = {A1B2C3D4-0002-0000-0000-000000000001}
+		{B1000002-0000-0000-0000-000000000001} = {A1B2C3D4-0002-0000-0000-000000000001}
+		{B1000003-0000-0000-0000-000000000001} = {A1B2C3D4-0002-0000-0000-000000000001}
+		{B1000004-0000-0000-0000-000000000001} = {A1B2C3D4-0002-0000-0000-000000000001}
+		{7626426A-92CC-4566-A4F0-6C180FF3526B} = {A1B2C3D4-0002-0000-0000-000000000001}
+	EndGlobalSection
+EndGlobal
