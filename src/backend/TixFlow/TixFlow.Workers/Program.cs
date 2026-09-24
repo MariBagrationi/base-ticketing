@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using TixFlow.Infrastructure.Data;
 using TixFlow.Workers.Contract;
+using TixFlow.Workers.Indexer;
 
 namespace TixFlow.Workers;
 
@@ -21,6 +22,10 @@ public static class Program
         builder.Services.AddSingleton<IContractMintClient, ContractMintClient>();
         builder.Services.AddSingleton<INonceService, NonceService>();
         builder.Services.AddHostedService<MintWorker>();
+
+        builder.Services.Configure<IndexerOptions>(builder.Configuration.GetSection(IndexerOptions.SectionName));
+        builder.Services.AddSingleton<IWeb3Provider, Web3Provider>();
+        builder.Services.AddHostedService<ChainIndexer>();
 
         var host = builder.Build();
         host.Run();

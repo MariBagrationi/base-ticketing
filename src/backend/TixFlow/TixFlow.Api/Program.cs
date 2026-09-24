@@ -7,6 +7,7 @@ using StackExchange.Redis;
 using TixFlow.Api.Auth;
 using TixFlow.Api.Checkout;
 using TixFlow.Api.Queue;
+using TixFlow.Api.Tickets;
 using TixFlow.Infrastructure.Data;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -98,6 +99,7 @@ app.UseRateLimiter();
 app.MapAuthEndpoints();
 app.MapQueueEndpoints();
 app.MapCheckoutEndpoints();
+app.MapTicketEndpoints();
 app.MapHub<QueueHub>("/hubs/queue");
 
 app.Run();

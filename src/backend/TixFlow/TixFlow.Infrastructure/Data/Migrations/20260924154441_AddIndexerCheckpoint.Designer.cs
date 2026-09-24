@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TixFlow.Infrastructure.Data;
@@ -11,9 +12,11 @@ using TixFlow.Infrastructure.Data;
 namespace TixFlow.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(TixFlowDbContext))]
-    partial class TixFlowDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260924154441_AddIndexerCheckpoint")]
+    partial class AddIndexerCheckpoint
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

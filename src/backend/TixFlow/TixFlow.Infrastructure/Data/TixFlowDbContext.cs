@@ -13,6 +13,7 @@ public class TixFlowDbContext : DbContext
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<Ticket> Tickets => Set<Ticket>();
     public DbSet<MintJob> MintJobs => Set<MintJob>();
+    public DbSet<IndexerCheckpoint> IndexerCheckpoints => Set<IndexerCheckpoint>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
