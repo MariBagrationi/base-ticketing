@@ -15,4 +15,5 @@ public class Ticket
     public Order Order { get; set; } = null!;
     public TicketTier TicketTier { get; set; } = null!;
     public User Owner { get; set; } = null!;
+    public ICollection<MintJob> MintJobs { get; set; } = [];
 }

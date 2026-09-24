@@ -14,6 +14,7 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="Nethereum.Signer" Version="6.1.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="StackExchange.Redis" Version="2.8.41" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
   </ItemGroup>
 
@@ -25,6 +26,7 @@
     <ProjectReference Include="..\TixFlow.Api\TixFlow.Api.csproj" />
     <ProjectReference Include="..\TixFlow.Domain\TixFlow.Domain.csproj" />
     <ProjectReference Include="..\TixFlow.Infrastructure\TixFlow.Infrastructure.csproj" />
+    <ProjectReference Include="..\TixFlow.Workers\TixFlow.Workers.csproj" />
   </ItemGroup>
 
 </Project>

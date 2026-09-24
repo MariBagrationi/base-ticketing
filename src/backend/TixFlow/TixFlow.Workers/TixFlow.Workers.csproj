@@ -9,11 +9,17 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
+    <PackageReference Include="Nethereum.Web3" Version="6.1.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\TixFlow.Domain\TixFlow.Domain.csproj" />
     <ProjectReference Include="..\TixFlow.Infrastructure\TixFlow.Infrastructure.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Contract\EventTicketAbi.json" />
+  </ItemGroup>
+
 
 </Project>
