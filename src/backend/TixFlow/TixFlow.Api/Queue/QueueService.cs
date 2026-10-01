@@ -94,7 +94,7 @@ public class QueueService : IQueueStore
     {
         var db = _redis.GetDatabase();
         var key = AdmissionTokenKey(tokenId);
-        await db.HashSetAsync(key, "consumed", "true", When.Exists);
+        await db.HashSetAsync(key, "consumed", "true");
     }
 
     public async Task<(int batchSize, int intervalSeconds)> GetEventConfigAsync(Guid eventId, QueueOptions defaults)

@@ -38,7 +38,7 @@ public static class QueueEndpoints
             var removed = await queueService.LeaveAsync(eventId, userId.Value);
             return removed
                 ? Results.Ok(new { removed = true })
-                : Results.Ok(new { removed = false, reason = "Not in queue or already admitted." });
+                : Results.NotFound(new { removed = false, reason = "Not in queue or already admitted." });
         });
 
         group.MapGet("/{eventId:guid}/position", async (

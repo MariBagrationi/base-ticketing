@@ -7,6 +7,7 @@ using StackExchange.Redis;
 using TixFlow.Api.Auth;
 using TixFlow.Api.Checkout;
 using TixFlow.Api.Queue;
+using TixFlow.Api.Redeem;
 using TixFlow.Api.Tickets;
 using TixFlow.Infrastructure.Data;
 
@@ -30,6 +31,9 @@ builder.Services.Configure<QueueOptions>(builder.Configuration.GetSection(QueueO
 builder.Services.AddScoped<IQueueStore, QueueService>();
 builder.Services.AddScoped<AdmissionTokenService>();
 builder.Services.AddHostedService<AdmissionWorker>();
+
+// Redeem challenge store
+builder.Services.AddScoped<IChallengeStore, RedisChallengeStore>();
 
 // SignalR
 builder.Services.AddSignalR();
@@ -100,6 +104,7 @@ app.MapAuthEndpoints();
 app.MapQueueEndpoints();
 app.MapCheckoutEndpoints();
 app.MapTicketEndpoints();
+app.MapRedeemEndpoints();
 app.MapHub<QueueHub>("/hubs/queue");
 
 app.Run();

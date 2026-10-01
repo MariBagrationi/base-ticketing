@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using StackExchange.Redis;
 using TixFlow.Api.Queue;
+using TixFlow.Api.Redeem;
 using TixFlow.Infrastructure.Data;
 
 namespace TixFlow.Tests;
@@ -13,8 +14,10 @@ namespace TixFlow.Tests;
 public class TixFlowWebFactory : WebApplicationFactory<Program>
 {
     private readonly InMemoryQueueStore _queueStore = new();
+    private readonly InMemoryChallengeStore _challengeStore = new();
 
     public InMemoryQueueStore QueueStore => _queueStore;
+    public InMemoryChallengeStore ChallengeStore => _challengeStore;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -59,6 +62,12 @@ public class TixFlowWebFactory : WebApplicationFactory<Program>
             if (queueDescriptor is not null)
                 services.Remove(queueDescriptor);
             services.AddSingleton<IQueueStore>(_queueStore);
+
+            // Replace IChallengeStore with in-memory implementation
+            var challengeDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IChallengeStore));
+            if (challengeDescriptor is not null)
+                services.Remove(challengeDescriptor);
+            services.AddSingleton<IChallengeStore>(_challengeStore);
 
             // Remove AdmissionWorker so it doesn't run during tests
             var workerDescriptors = services
