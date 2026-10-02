@@ -1,0 +1,177 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f3f4f7;
+  --foreground: #0e1220;
+  --surface: #ffffff;
+  --surface-alt: #eef0f4;
+  --border: #dfe2ea;
+  --border-strong: #c9cedb;
+  --muted: #5b6275;
+  --accent: #0052ff;
+  --accent-hover: #0043d1;
+  --accent-soft: #e6eeff;
+  --accent-ink: #0039b3;
+  --success: #0f8a4f;
+  --success-soft: #e2f4ea;
+  --warning: #a8530a;
+  --warning-soft: #fdf1dc;
+  --danger: #c8261b;
+  --danger-soft: #fbe9e7;
+  --shadow: 0 1px 2px rgb(14 18 32 / 0.04), 0 4px 16px rgb(14 18 32 / 0.06);
+  --shadow-lg: 0 2px 4px rgb(14 18 32 / 0.04), 0 16px 40px rgb(14 18 32 / 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: #0a0d14;
+    --foreground: #e9ecf3;
+    --surface: #121722;
+    --surface-alt: #1a2030;
+    --border: #252c3d;
+    --border-strong: #343d52;
+    --muted: #8e96aa;
+    --accent: #3b7bff;
+    --accent-hover: #5a90ff;
+    --accent-soft: #15223f;
+    --accent-ink: #9dbbff;
+    --success: #34c77b;
+    --success-soft: #10291e;
+    --warning: #f5a524;
+    --warning-soft: #2b2210;
+    --danger: #f2685a;
+    --danger-soft: #2d1513;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 16px rgb(0 0 0 / 0.25);
+    --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.3), 0 16px 40px rgb(0 0 0 / 0.45);
+  }
+}
+
+:root[data-theme="dark"] {
+  --background: #0a0d14;
+  --foreground: #e9ecf3;
+  --surface: #121722;
+  --surface-alt: #1a2030;
+  --border: #252c3d;
+  --border-strong: #343d52;
+  --muted: #8e96aa;
+  --accent: #3b7bff;
+  --accent-hover: #5a90ff;
+  --accent-soft: #15223f;
+  --accent-ink: #9dbbff;
+  --success: #34c77b;
+  --success-soft: #10291e;
+  --warning: #f5a524;
+  --warning-soft: #2b2210;
+  --danger: #f2685a;
+  --danger-soft: #2d1513;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 16px rgb(0 0 0 / 0.25);
+  --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.3), 0 16px 40px rgb(0 0 0 / 0.45);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-alt: var(--surface-alt);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-bricolage);
+  --shadow-card: var(--shadow);
+  --shadow-pop: var(--shadow-lg);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Perforated divider between a ticket's body and its stub; the punched holes take the page colour. */
+.perforation {
+  position: relative;
+  border-color: var(--border-strong);
+  border-style: dashed;
+}
+.perforation::before,
+.perforation::after {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  background: var(--background);
+  border: 1px solid var(--border);
+}
+.perforation-v {
+  border-left-width: 2px;
+}
+.perforation-v::before,
+.perforation-v::after {
+  left: -11px;
+}
+.perforation-v::before {
+  top: -11px;
+}
+.perforation-v::after {
+  bottom: -11px;
+}
+.perforation-h {
+  border-top-width: 2px;
+}
+.perforation-h::before,
+.perforation-h::after {
+  top: -11px;
+}
+.perforation-h::before {
+  left: -11px;
+}
+.perforation-h::after {
+  right: -11px;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-rise {
+  animation: rise 0.25s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
