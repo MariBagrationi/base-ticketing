@@ -7,6 +7,7 @@ public class InMemoryQueueStore : IQueueStore
 {
     private readonly ConcurrentDictionary<Guid, SortedList<double, Guid>> _queues = new();
     private readonly ConcurrentDictionary<string, AdmissionRecord> _admissionTokens = new();
+    private readonly ConcurrentDictionary<(Guid, Guid), (string, string)> _latestAdmissions = new();
     private readonly object _lock = new();
 
     public Task<(long position, long queueLength)> JoinAsync(Guid eventId, Guid userId)
@@ -113,6 +114,19 @@ public class InMemoryQueueStore : IQueueStore
         if (_admissionTokens.TryGetValue(tokenId, out var record))
             _admissionTokens[tokenId] = record with { Consumed = true };
         return Task.CompletedTask;
+    }
+
+    public Task StoreLatestAdmissionAsync(Guid eventId, Guid userId, string token, string tokenId, TimeSpan ttl)
+    {
+        _latestAdmissions[(eventId, userId)] = (token, tokenId);
+        return Task.CompletedTask;
+    }
+
+    public Task<(string token, string tokenId)?> GetLatestAdmissionAsync(Guid eventId, Guid userId)
+    {
+        return Task.FromResult(_latestAdmissions.TryGetValue((eventId, userId), out var entry)
+            ? ((string, string)?)entry
+            : null);
     }
 
     public Task<(int batchSize, int intervalSeconds)> GetEventConfigAsync(Guid eventId, QueueOptions defaults)

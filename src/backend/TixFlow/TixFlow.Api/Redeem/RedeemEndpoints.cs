@@ -87,7 +87,7 @@ public static class RedeemEndpoints
             }
 
             if (!string.Equals(recoveredAddress, ticket.Owner.WalletAddress, StringComparison.OrdinalIgnoreCase))
-                return Results.Forbid();
+                return Results.Json(new { message = "Signature doesn't match the ticket owner's wallet." }, statusCode: 403);
 
             var now = DateTimeOffset.UtcNow;
             ticket.Status = TicketStatus.Redeemed;

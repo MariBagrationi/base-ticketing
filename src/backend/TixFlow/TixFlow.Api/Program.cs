@@ -6,8 +6,11 @@ using Microsoft.IdentityModel.Tokens;
 using StackExchange.Redis;
 using TixFlow.Api.Auth;
 using TixFlow.Api.Checkout;
+using TixFlow.Api.Demo;
 using TixFlow.Api.Queue;
 using TixFlow.Api.Redeem;
+using TixFlow.Api.Events;
+using TixFlow.Api.Health;
 using TixFlow.Api.Tickets;
 using TixFlow.Infrastructure.Data;
 
@@ -34,6 +37,21 @@ builder.Services.AddHostedService<AdmissionWorker>();
 
 // Redeem challenge store
 builder.Services.AddScoped<IChallengeStore, RedisChallengeStore>();
+
+if (builder.Configuration.GetValue<bool>("Demo:SimulateMint"))
+    builder.Services.AddHostedService<DemoMintWorker>();
+
+// CORS for frontend dev server
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("frontend", policy =>
+    {
+        policy.WithOrigins("http://localhost:3000")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
 
 // SignalR
 builder.Services.AddSignalR();
@@ -95,16 +113,19 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.UseCors("frontend");
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapAuthEndpoints();
+app.MapEventEndpoints();
 app.MapQueueEndpoints();
 app.MapCheckoutEndpoints();
 app.MapTicketEndpoints();
 app.MapRedeemEndpoints();
+app.MapHealthEndpoints();
 app.MapHub<QueueHub>("/hubs/queue");
 
 app.Run();

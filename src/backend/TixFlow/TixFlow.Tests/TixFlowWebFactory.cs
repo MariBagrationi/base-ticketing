@@ -33,7 +33,8 @@ public class TixFlowWebFactory : WebApplicationFactory<Program>
                 ["Queue:DefaultIntervalSeconds"] = "1",
                 ["Queue:AdmissionTokenTtlMinutes"] = "5",
                 ["Queue:PositionBroadcastIntervalSeconds"] = "5",
-                ["ConnectionStrings:Redis"] = "localhost:6379"
+                ["ConnectionStrings:Redis"] = "localhost:6379",
+                ["Demo:SimulateMint"] = "false"
             });
         });
 
@@ -72,8 +73,7 @@ public class TixFlowWebFactory : WebApplicationFactory<Program>
             // Remove AdmissionWorker so it doesn't run during tests
             var workerDescriptors = services
                 .Where(d => d.ImplementationType == typeof(AdmissionWorker)
-                         || (d.ServiceType == typeof(IHostedService)
-                             && d.ImplementationType == typeof(AdmissionWorker)))
+                         || d.ImplementationType == typeof(TixFlow.Api.Demo.DemoMintWorker))
                 .ToList();
             foreach (var d in workerDescriptors)
                 services.Remove(d);
