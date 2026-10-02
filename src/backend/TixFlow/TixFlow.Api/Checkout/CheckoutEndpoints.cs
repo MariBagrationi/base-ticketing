@@ -10,16 +10,42 @@ namespace TixFlow.Api.Checkout;
 
 public static class CheckoutEndpoints
 {
+    private const int MaxTicketsPerOrder = 4;
+
     public static void MapCheckoutEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/checkout").WithTags("Checkout").RequireAuthorization();
 
         group.MapPost("/reserve", async (
             ClaimsPrincipal user,
+            HttpContext httpContext,
             [FromBody] ReserveRequest request,
             TixFlowDbContext db) =>
         {
             var userId = Guid.Parse(user.FindFirstValue("sub")!);
+
+            if (request.Quantity is < 1 or > MaxTicketsPerOrder)
+                return Results.BadRequest(new { message = $"You can buy between 1 and {MaxTicketsPerOrder} tickets per order." });
+
+            if (httpContext.Items["AdmissionEventId"] is Guid admittedEventId && admittedEventId != request.EventId)
+                return Results.Json(new { message = "Your queue admission is for a different event." }, statusCode: 403);
+
+            var tier = await db.TicketTiers
+                .Where(t => t.Id == request.TierId && t.EventId == request.EventId)
+                .Select(t => new { t.TotalSupply, Sold = t.Tickets.Count })
+                .FirstOrDefaultAsync();
+
+            if (tier is null)
+                return Results.NotFound(new { message = "That ticket tier doesn't exist for this event." });
+
+            var remaining = tier.TotalSupply - tier.Sold;
+            if (request.Quantity > remaining)
+                return Results.Conflict(new
+                {
+                    message = remaining <= 0
+                        ? "This tier is sold out."
+                        : $"Only {remaining} ticket{(remaining == 1 ? "" : "s")} left in this tier."
+                });
             var orderId = Guid.NewGuid();
             var now = DateTimeOffset.UtcNow;
 
@@ -77,7 +103,7 @@ public static class CheckoutEndpoints
                 return Results.NotFound(new { message = "Order not found." });
 
             if (order.BuyerId != userId)
-                return Results.Forbid();
+                return Results.Json(new { message = "This order belongs to another wallet." }, statusCode: 403);
 
             if (order.Status != OrderStatus.Pending)
                 return Results.Conflict(new { message = $"Order is already {order.Status}." });
