@@ -60,6 +60,26 @@ public static class QueueEndpoints
 
             return Results.Ok(new { position, estimatedWaitSeconds });
         });
+
+        group.MapGet("/{eventId:guid}/admission", async (
+            Guid eventId,
+            ClaimsPrincipal user,
+            IQueueStore queueService) =>
+        {
+            var userId = GetUserId(user);
+            if (userId is null)
+                return Results.Unauthorized();
+
+            var latest = await queueService.GetLatestAdmissionAsync(eventId, userId.Value);
+            if (latest is null)
+                return Results.NotFound(new { message = "Not admitted yet." });
+
+            var (valid, consumed) = await queueService.ValidateAdmissionTokenAsync(latest.Value.tokenId, userId.Value, eventId);
+            if (!valid || consumed)
+                return Results.NotFound(new { message = "No unused admission for this event." });
+
+            return Results.Ok(new { admissionToken = latest.Value.token });
+        });
     }
 
     private static Guid? GetUserId(ClaimsPrincipal user)

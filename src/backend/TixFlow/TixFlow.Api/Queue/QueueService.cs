@@ -14,6 +14,7 @@ public class QueueService : IQueueStore
     private static string QueueKey(Guid eventId) => $"queue:{eventId}";
     private static string AdmissionTokenKey(string tokenId) => $"admission:{tokenId}";
     private static string EventConfigKey(Guid eventId) => $"queue:{eventId}:config";
+    private static string LatestAdmissionKey(Guid eventId, Guid userId) => $"admitted:{eventId}:{userId}";
 
     public async Task<(long position, long queueLength)> JoinAsync(Guid eventId, Guid userId)
     {
@@ -95,6 +96,26 @@ public class QueueService : IQueueStore
         var db = _redis.GetDatabase();
         var key = AdmissionTokenKey(tokenId);
         await db.HashSetAsync(key, "consumed", "true");
+    }
+
+    public async Task StoreLatestAdmissionAsync(Guid eventId, Guid userId, string token, string tokenId, TimeSpan ttl)
+    {
+        var db = _redis.GetDatabase();
+        var key = LatestAdmissionKey(eventId, userId);
+        await db.HashSetAsync(key, [new HashEntry("token", token), new HashEntry("tokenId", tokenId)]);
+        await db.KeyExpireAsync(key, ttl);
+    }
+
+    public async Task<(string token, string tokenId)?> GetLatestAdmissionAsync(Guid eventId, Guid userId)
+    {
+        var db = _redis.GetDatabase();
+        var entries = await db.HashGetAllAsync(LatestAdmissionKey(eventId, userId));
+        if (entries.Length == 0)
+            return null;
+
+        var token = entries.FirstOrDefault(e => e.Name == "token").Value.ToString();
+        var tokenId = entries.FirstOrDefault(e => e.Name == "tokenId").Value.ToString();
+        return (token, tokenId);
     }
 
     public async Task<(int batchSize, int intervalSeconds)> GetEventConfigAsync(Guid eventId, QueueOptions defaults)

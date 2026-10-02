@@ -70,6 +70,7 @@ public class AdmissionWorker : BackgroundService
 
                 var (token, tokenId) = tokenService.GenerateAdmissionToken(userId, eventId);
                 await queueService.StoreAdmissionTokenAsync(tokenId, userId, eventId, ttl);
+                await queueService.StoreLatestAdmissionAsync(eventId, userId, token, tokenId, ttl);
 
                 try
                 {

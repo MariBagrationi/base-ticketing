@@ -111,8 +111,9 @@ public class QueueTests : IClassFixture<TixFlowWebFactory>
         var (token, tokenId) = tokenService.GenerateAdmissionToken(userId, eventId);
         await queueStore.StoreAdmissionTokenAsync(tokenId, userId, eventId, TimeSpan.FromMinutes(5));
 
+        var tierId = await SeedTierAsync(eventId);
         client.DefaultRequestHeaders.Add("X-Admission-Token", token);
-        var reserveBody = new { eventId, tierId = Guid.NewGuid(), quantity = 1 };
+        var reserveBody = new { eventId, tierId, quantity = 1 };
         var response = await client.PostAsJsonAsync("/checkout/reserve", reserveBody);
         response.EnsureSuccessStatusCode();
     }
@@ -171,8 +172,9 @@ public class QueueTests : IClassFixture<TixFlowWebFactory>
         var (token, tokenId) = tokenService.GenerateAdmissionToken(userId, eventId);
         await queueStore.StoreAdmissionTokenAsync(tokenId, userId, eventId, TimeSpan.FromMinutes(5));
 
+        var tierId = await SeedTierAsync(eventId);
         client.DefaultRequestHeaders.Add("X-Admission-Token", token);
-        var reserveBody = new { eventId, tierId = Guid.NewGuid(), quantity = 1 };
+        var reserveBody = new { eventId, tierId, quantity = 1 };
 
         // First use succeeds
         var first = await client.PostAsJsonAsync("/checkout/reserve", reserveBody);
@@ -239,6 +241,31 @@ public class QueueTests : IClassFixture<TixFlowWebFactory>
 
         var length = await queueStore.GetQueueLengthAsync(eventId);
         Assert.Equal(count, length);
+    }
+
+    private async Task<Guid> SeedTierAsync(Guid eventId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TixFlow.Infrastructure.Data.TixFlowDbContext>();
+        var tierId = Guid.NewGuid();
+        db.Events.Add(new TixFlow.Domain.Entities.Event
+        {
+            Id = eventId,
+            Name = "Test Event",
+            VenueName = "Test Venue",
+            StartsAt = DateTimeOffset.UtcNow.AddDays(7),
+            OrganizerId = Guid.NewGuid()
+        });
+        db.TicketTiers.Add(new TixFlow.Domain.Entities.TicketTier
+        {
+            Id = tierId,
+            EventId = eventId,
+            Name = "GA",
+            PriceUsdc = 10,
+            TotalSupply = 100
+        });
+        await db.SaveChangesAsync();
+        return tierId;
     }
 
     private async Task<HttpClient> CreateAuthenticatedClient()
