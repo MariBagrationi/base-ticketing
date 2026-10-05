@@ -14,7 +14,7 @@ const unexpectedErrors = new Counter('unexpected_errors'); // 500, timeouts
 const errorRate = new Rate('error_rate');
 
 // ---------- Config ----------
-const BASE_URL = __ENV.BASE_URL || 'http://localhost:5102';
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:5222';
 
 const users = new SharedArray('users', function () {
   return JSON.parse(open('./users.json'));

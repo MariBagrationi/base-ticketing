@@ -80,7 +80,9 @@ export default function EventPage() {
             </div>
           </div>
 
-          {event.description && <p className="mt-6 max-w-[65ch] leading-relaxed">{event.description}</p>}
+          {event.description && (
+            <p className="mt-6 max-w-[65ch] whitespace-pre-line leading-relaxed text-foreground/90">{event.description}</p>
+          )}
 
           <h2 className="mb-3 mt-10 font-display text-lg font-bold">Tickets</h2>
           <div className="space-y-3">

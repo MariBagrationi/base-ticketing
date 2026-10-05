@@ -1,3 +1,5 @@
+# Full stack:      docker compose up --build
+# Databases only:  docker compose up -d postgres redis   (when running the API and web app locally)
 services:
   postgres:
     image: postgres:16-alpine
@@ -9,11 +11,51 @@ services:
       POSTGRES_DB: tixflow
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tixflow -d tixflow"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: ./src/backend/TixFlow
+      dockerfile: TixFlow.Api/Dockerfile
+    ports:
+      - "5222:8080"
+    environment:
+      # Development enables the demo features: simulated minting and seeded events.
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=tixflow;Username=tixflow;Password=tixflow_dev
+      ConnectionStrings__Redis: redis:6379
+      Database__MigrateOnStartup: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./src/frontend/web
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:5222
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    restart: unless-stopped
 
 volumes:
   pgdata:
