@@ -82,6 +82,14 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
                     context.Token = accessToken;
                 return Task.CompletedTask;
+            },
+            // A token can outlive its user (e.g. after a database reset); reject it so the client signs in again.
+            OnTokenValidated = async context =>
+            {
+                var sub = context.Principal?.FindFirst("sub")?.Value;
+                var db = context.HttpContext.RequestServices.GetRequiredService<TixFlowDbContext>();
+                if (!Guid.TryParse(sub, out var userId) || !await db.Users.AnyAsync(u => u.Id == userId))
+                    context.Fail("User no longer exists.");
             }
         };
     });
@@ -107,6 +115,8 @@ builder.Services.AddRateLimiter(options =>
 });
 
 var app = builder.Build();
+
+await app.InitializeDatabaseAsync();
 
 if (app.Environment.IsDevelopment())
 {

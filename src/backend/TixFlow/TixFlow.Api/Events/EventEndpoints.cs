@@ -25,7 +25,7 @@ public static class EventEndpoints
                     e.VenueName,
                     e.StartsAt,
                     e.OrganizerId,
-                    Tiers = e.TicketTiers.Select(t => new
+                    Tiers = e.TicketTiers.OrderBy(t => t.PriceUsdc).Select(t => new
                     {
                         t.Id,
                         t.Name,
@@ -53,7 +53,7 @@ public static class EventEndpoints
                     e.VenueName,
                     e.StartsAt,
                     e.OrganizerId,
-                    Tiers = e.TicketTiers.Select(t => new
+                    Tiers = e.TicketTiers.OrderBy(t => t.PriceUsdc).Select(t => new
                     {
                         t.Id,
                         t.Name,
