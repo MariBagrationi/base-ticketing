@@ -10,13 +10,15 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
+import { privateKeyToAccount } from "viem/accounts";
 import { api, setReauthenticate, setToken, type Role } from "./api";
+import { requestMetaMaskAccounts, signMetaMaskMessage } from "./metamask";
 
 export interface DemoWallet {
   label: string;
   address: `0x${string}`;
-  privateKey: `0x${string}`;
+  privateKey?: `0x${string}`;
+  source: "metamask" | "demo";
 }
 
 export type AuthStatus = "loading" | "no-wallet" | "signing-in" | "ready" | "error";
@@ -25,24 +27,19 @@ interface AuthState {
   wallets: DemoWallet[];
   wallet: DemoWallet | null;
   userId: string | null;
-  /** Live roles from the server. They only drive what the UI shows; the API enforces them itself. */
   roles: Role[];
   staffEventIds: string[];
   isAdmin: boolean;
-  /** Staff or Admin: may use the door scanner. */
   isStaff: boolean;
-  /** User or Admin: may queue, buy and hold tickets. */
   isBuyer: boolean;
   status: AuthStatus;
   isAuthed: boolean;
   error: string | null;
-  createWallet: (label?: string) => DemoWallet;
-  /** Adds a wallet from an existing private key (demo accounts) and switches to it. */
+  connectMetaMask: () => Promise<DemoWallet>;
   importWallet: (label: string, privateKey: `0x${string}`) => DemoWallet;
   switchWallet: (address: string) => void;
   removeWallet: (address: string) => void;
   signMessage: (message: string) => Promise<string>;
-  /** Cached session token of any local wallet, if it has signed in before. */
   tokenFor: (address: string) => string | null;
   refreshRoles: () => Promise<void>;
   retry: () => void;
@@ -56,8 +53,8 @@ export function useAuth() {
   return ctx;
 }
 
-const WALLETS_KEY = "tixflow.demoWallets";
-const ACTIVE_KEY = "tixflow.activeWallet";
+const WALLETS_KEY = "tixflow.wallets.v2";
+const ACTIVE_KEY = "tixflow.activeWallet.v2";
 const jwtKey = (address: string) => `tixflow.jwt.${address.toLowerCase()}`;
 
 function read(key: string) {
@@ -75,19 +72,13 @@ function write(key: string, value: string | null) {
   } catch {}
 }
 
-function defaultLabel(count: number) {
-  return count === 0 ? "Buyer" : `Wallet ${count + 1}`;
-}
-
 async function signIn(wallet: DemoWallet): Promise<string> {
-  const account = privateKeyToAccount(wallet.privateKey);
   const { nonce } = await api.getNonce();
-  // Sign in on the chain the backend actually uses; Base mainnet when it runs without one.
   const chain = await api.getChainConfig().catch(() => null);
   const chainId = chain?.enabled ? chain.chainId : 8453;
   const message = [
     `${window.location.host} wants you to sign in with your Ethereum account:`,
-    account.address,
+    wallet.address,
     "",
     "Sign in to TixFlow",
     "",
@@ -97,7 +88,9 @@ async function signIn(wallet: DemoWallet): Promise<string> {
     `Nonce: ${nonce}`,
     `Issued At: ${new Date().toISOString()}`,
   ].join("\n");
-  const signature = await account.signMessage({ message });
+  const signature = wallet.privateKey
+    ? await privateKeyToAccount(wallet.privateKey).signMessage({ message })
+    : await signMetaMaskMessage(wallet.address, message);
   const { token } = await api.verify(message, signature);
   write(jwtKey(wallet.address), token);
   return token;
@@ -118,12 +111,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let stored: DemoWallet[] = [];
     try {
-      stored = JSON.parse(read(WALLETS_KEY) || "[]");
+      stored = (JSON.parse(read(WALLETS_KEY) || "[]") as DemoWallet[]).filter((w) => w.source === "demo");
     } catch {}
-    const active = read(ACTIVE_KEY);
     walletsRef.current = stored;
     setWallets(stored);
-    setActiveAddress(stored.find((w) => w.address === active)?.address ?? stored[0]?.address ?? null);
+    const active = read(ACTIVE_KEY);
+    setActiveAddress(stored.find((w) => w.address.toLowerCase() === active?.toLowerCase())?.address ?? null);
     setLoaded(true);
   }, []);
 
@@ -136,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const wallet = useMemo(
-    () => wallets.find((w) => w.address === activeAddress) ?? null,
+    () => wallets.find((w) => w.address.toLowerCase() === activeAddress?.toLowerCase()) ?? null,
     [wallets, activeAddress]
   );
 
@@ -169,8 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUserId(null);
       setRoles([]);
       try {
-        const cached = read(jwtKey(wallet.address));
-        setToken(cached ?? (await signIn(wallet)));
+        setToken(read(jwtKey(wallet.address)) ?? (await signIn(wallet)));
         if (cancelled) return;
         const me = await api.getMe();
         if (cancelled) return;
@@ -191,29 +183,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [wallet, loaded, attempt]);
 
-  const createWallet = useCallback(
-    (label?: string) => {
-      const privateKey = generatePrivateKey();
-      const created: DemoWallet = {
-        label: label?.trim() || defaultLabel(walletsRef.current.length),
-        address: privateKeyToAccount(privateKey).address,
-        privateKey,
-      };
-      persist([...walletsRef.current, created], created.address);
-      return created;
-    },
-    [persist]
-  );
+  const connectMetaMask = useCallback(async () => {
+    const [address] = await requestMetaMaskAccounts();
+    const normalized = address.toLowerCase() as `0x${string}`;
+    const connected: DemoWallet = { label: "MetaMask", address: normalized, source: "metamask" };
+    const next = [...walletsRef.current.filter((w) => w.address.toLowerCase() !== normalized), connected];
+    persist(next, normalized);
+    return connected;
+  }, [persist]);
 
   const importWallet = useCallback(
     (label: string, privateKey: `0x${string}`) => {
       const address = privateKeyToAccount(privateKey).address;
-      const existing = walletsRef.current.find((w) => w.address === address);
+      const existing = walletsRef.current.find((w) => w.address.toLowerCase() === address.toLowerCase());
       if (existing) {
         persist(walletsRef.current, address);
         return existing;
       }
-      const imported: DemoWallet = { label, address, privateKey };
+      const imported: DemoWallet = { label, address, privateKey, source: "demo" };
       persist([...walletsRef.current, imported], address);
       return imported;
     },
@@ -222,37 +209,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const switchWallet = useCallback(
     (address: string) => {
-      if (walletsRef.current.some((w) => w.address === address)) persist(walletsRef.current, address);
+      if (walletsRef.current.some((w) => w.address.toLowerCase() === address.toLowerCase())) persist(walletsRef.current, address);
     },
     [persist]
   );
 
   const removeWallet = useCallback(
     (address: string) => {
-      const next = walletsRef.current.filter((w) => w.address !== address);
+      const next = walletsRef.current.filter((w) => w.address.toLowerCase() !== address.toLowerCase());
       write(jwtKey(address), null);
-      persist(next, activeAddress === address ? (next[0]?.address ?? null) : activeAddress);
+      persist(next, activeAddress?.toLowerCase() === address.toLowerCase() ? null : activeAddress);
     },
     [persist, activeAddress]
   );
 
   const signMessage = useCallback(
     async (message: string) => {
-      if (!wallet) throw new Error("Create a demo wallet first.");
-      return privateKeyToAccount(wallet.privateKey).signMessage({ message });
+      if (!wallet) throw new Error("Connect a wallet first.");
+      return wallet.privateKey
+        ? privateKeyToAccount(wallet.privateKey).signMessage({ message })
+        : signMetaMaskMessage(wallet.address, message);
     },
     [wallet]
   );
 
+  const tokenFor = useCallback((address: string) => read(jwtKey(address)), []);
   const refreshRoles = useCallback(async () => {
     const me = await api.getMe();
     setRoles(me.roles);
     setStaffEventIds(me.staffEventIds);
   }, []);
-
-  const tokenFor = useCallback((address: string) => read(jwtKey(address)), []);
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
-
   const isAdmin = roles.includes("Admin");
   const value: AuthState = {
     wallets,
@@ -261,12 +248,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     roles,
     staffEventIds,
     isAdmin,
-    isStaff: isAdmin || roles.includes("Staff"),
-    isBuyer: isAdmin || roles.includes("User"),
+    isStaff: roles.includes("Staff"),
+    isBuyer: roles.includes("User") && !isAdmin,
     status,
     isAuthed: status === "ready",
     error,
-    createWallet,
+    connectMetaMask,
     importWallet,
     switchWallet,
     removeWallet,
@@ -275,6 +262,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshRoles,
     retry,
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.ethereum) return;
+    const provider = window.ethereum;
+    const onAccountsChanged = (...args: unknown[]) => {
+      const addresses = args[0];
+      if (Array.isArray(addresses) && typeof addresses[0] === "string") {
+        const current = walletsRef.current.find((w) => w.source === "metamask");
+        if (current) {
+          const next = { ...current, address: addresses[0].toLowerCase() as `0x${string}` };
+          persist([...walletsRef.current.filter((w) => w.source !== "metamask"), next], next.address);
+        }
+      }
+    };
+    provider.on?.("accountsChanged", onAccountsChanged);
+    return () => provider.removeListener?.("accountsChanged", onAccountsChanged);
+  }, [persist]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

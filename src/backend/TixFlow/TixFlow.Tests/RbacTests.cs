@@ -206,16 +206,16 @@ public class RbacTests : IClassFixture<RbacFactory>
     }
 
     [Fact]
-    public async Task Admin_SatisfiesEveryPolicy()
+    public async Task Admin_CanManageEventsButCannotBuyOrScan()
     {
         var admin = await AdminAsync();
         var evt = await TestSupport.SeedEventAsync(_factory);
         var (ticketId, eventId, _) = await MintedTicketAsync();
 
-        Assert.Equal(HttpStatusCode.OK, (await admin.PostAsync($"/queue/{evt.EventId}/join", null)).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/redeem/events")).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await admin.PostAsync($"/redeem/{ticketId}/challenge", null)).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync($"/events/{eventId}/checkins")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await admin.PostAsync($"/queue/{evt.EventId}/join", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await admin.GetAsync("/redeem/events")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await admin.PostAsync($"/redeem/{ticketId}/challenge", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await admin.GetAsync($"/events/{eventId}/checkins")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/admin/users")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/admin/audit-log")).StatusCode);
 
@@ -275,7 +275,7 @@ public class RbacTests : IClassFixture<RbacFactory>
     }
 
     [Fact]
-    public async Task Staff_AssignedToAnEvent_CanOnlyScanThatEvent()
+    public async Task Staff_CanScanEveryActiveEventRegardlessOfAssignment()
     {
         var admin = await AdminAsync();
         var (staff, _, staffKey) = await TestSupport.SignInAsAsync(_factory, Role.Staff);
@@ -289,19 +289,20 @@ public class RbacTests : IClassFixture<RbacFactory>
         assign.EnsureSuccessStatusCode();
 
         Assert.Equal(HttpStatusCode.OK, (await staff.PostAsync($"/redeem/{assignedTicket}/challenge", null)).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await staff.PostAsync($"/redeem/{otherTicket}/challenge", null)).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden,
+        Assert.Equal(HttpStatusCode.OK, (await staff.PostAsync($"/redeem/{otherTicket}/challenge", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity,
             (await staff.PostAsJsonAsync($"/redeem/{otherTicket}/confirm", new { challenge = "x", signature = "0x00" })).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync($"/events/{otherEvent}/checkins")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await staff.GetAsync($"/events/{otherEvent}/checkins")).StatusCode);
 
         var visible = await staff.GetFromJsonAsync<JsonElement>("/redeem/events");
-        Assert.True(visible.GetProperty("scopedToAssignments").GetBoolean());
-        Assert.Equal([assignedEvent], visible.GetProperty("events").EnumerateArray().Select(e => e.GetProperty("id").GetGuid()).ToArray());
+        Assert.False(visible.GetProperty("scopedToAssignments").GetBoolean());
+        Assert.Contains(assignedEvent, visible.GetProperty("events").EnumerateArray().Select(e => e.GetProperty("id").GetGuid()));
+        Assert.Contains(otherEvent, visible.GetProperty("events").EnumerateArray().Select(e => e.GetProperty("id").GetGuid()));
 
         var me = await staff.GetFromJsonAsync<JsonElement>("/auth/me");
         Assert.Equal([assignedEvent], me.GetProperty("staffEventIds").EnumerateArray().Select(e => e.GetGuid()).ToArray());
 
-        // Removing the assignment lifts the restriction again.
+        // Removing the assignment does not change the Staff scanning scope.
         (await admin.DeleteAsync($"/admin/events/{assignedEvent}/staff/{staffKey.GetPublicAddress()}")).EnsureSuccessStatusCode();
         Assert.Equal(HttpStatusCode.OK, (await staff.PostAsync($"/redeem/{otherTicket}/challenge", null)).StatusCode);
     }

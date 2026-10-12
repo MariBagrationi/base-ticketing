@@ -3,6 +3,13 @@ export function shortAddress(address?: string | null) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
+export function formatEth(amount: number) {
+  return `${amount.toLocaleString("en-US", {
+    minimumFractionDigits: amount > 0 && amount < 1 ? 3 : 0,
+    maximumFractionDigits: 4,
+  })} ETH`;
+}
+
 export function shortHash(hash?: string | null) {
   if (!hash) return "";
   return `${hash.slice(0, 10)}…${hash.slice(-6)}`;

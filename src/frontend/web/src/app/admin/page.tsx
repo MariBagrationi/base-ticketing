@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, type AdminUser, type AuditEntry, type EventSummary, type Role } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { shortAddress } from "@/lib/format";
-import { Avatar, Button, Card, Notice, PageHeader, PageSpinner, inputClass } from "@/components/ui";
+import { Avatar, Button, ButtonLink, Card, Notice, PageHeader, PageSpinner, inputClass } from "@/components/ui";
 import { RoleBadge, RoleGate } from "@/components/RoleGate";
 import { useToast } from "@/components/Toaster";
 
@@ -66,6 +66,7 @@ function AdminConsole() {
         eyebrow="Administration"
         title="Roles and access"
         description="Every change here is checked on the server, takes effect on the user's next request, and is written to the audit log."
+        action={<ButtonLink href="/organizer">Manage events</ButtonLink>}
       />
 
       {error && (

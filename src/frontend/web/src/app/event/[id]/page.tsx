@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import * as signalR from "@microsoft/signalr";
 import { API_BASE, ApiError, api, getToken, type ChainActivity, type EventDetail } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { dateParts, formatUsdc } from "@/lib/format";
+import { dateParts, formatEth } from "@/lib/format";
 import { admissionKey } from "@/lib/admission";
 import { formatUsdcUnits, readEscrow, useChain } from "@/lib/chain";
 import { ExplorerLink } from "@/components/OnChain";
@@ -101,7 +101,7 @@ export default function EventPage() {
                       {left <= 0 ? "Sold out" : `${left.toLocaleString()} of ${tier.totalSupply.toLocaleString()} left`}
                     </p>
                   </div>
-                  <p className="font-display text-xl font-bold">{formatUsdc(tier.priceUsdc)}</p>
+                  <p className="font-display text-xl font-bold">{formatEth(tier.priceUsdc)}</p>
                 </div>
               );
             })}
@@ -203,7 +203,7 @@ function OnChainPanel({ event }: { event: EventDetail }) {
 function PurchasePanel({ eventId, soldOut }: { eventId: string; soldOut: boolean }) {
   const router = useRouter();
   const toast = useToast();
-  const { status, error, createWallet, retry, isBuyer } = useAuth();
+  const { status, error, connectMetaMask, retry, isBuyer } = useAuth();
   const [queue, setQueue] = useState<QueueState>({ phase: "checking" });
   const stopRef = useRef<() => void>(() => {});
 
@@ -331,16 +331,13 @@ function PurchasePanel({ eventId, soldOut }: { eventId: string; soldOut: boolean
         ) : status === "no-wallet" ? (
           <div className="text-center">
             <p className="font-display text-lg font-bold">Ready to get tickets?</p>
-            <p className="mt-1 text-sm text-muted">Create a demo wallet to join the queue. It takes one click.</p>
+             <p className="mt-1 text-sm text-muted">Connect MetaMask to join the queue and sign in securely.</p>
             <Button
               size="lg"
               className="mt-5 w-full"
-              onClick={() => {
-                const w = createWallet();
-                toast({ tone: "success", title: `Wallet “${w.label}” created` });
-              }}
+              onClick={() => connectMetaMask().catch((err) => toast({ tone: "error", title: "MetaMask connection failed", description: err instanceof Error ? err.message : undefined }))}
             >
-              Create demo wallet
+              Connect MetaMask
             </Button>
           </div>
         ) : status === "error" ? (

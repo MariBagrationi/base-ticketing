@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type EventSummary } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { dateParts, formatUsdc } from "@/lib/format";
+import { dateParts, formatEth } from "@/lib/format";
 import { Badge, Button, ButtonLink, EmptyState, Notice, PageHeader, PageSpinner, TicketIcon } from "@/components/ui";
 import { useToast } from "@/components/Toaster";
 import { DemoAccounts } from "@/components/RoleGate";
@@ -57,10 +57,9 @@ export default function Home() {
 }
 
 function Onboarding() {
-  const { createWallet } = useAuth();
-  const toast = useToast();
+  const { connectMetaMask } = useAuth();
   const steps = [
-    ["Create a demo wallet", "Generated in your browser. No MetaMask or extension needed."],
+    ["Connect your wallet", "Use MetaMask to sign in securely."],
     ["Join the fair queue", "Everyone gets a place in line. No bots skipping ahead."],
     ["Get your NFT ticket", "Pay, watch it mint, and show the QR code at the door."],
   ];
@@ -83,12 +82,9 @@ function Onboarding() {
         </ol>
         <Button
           size="lg"
-          onClick={() => {
-            const w = createWallet();
-            toast({ tone: "success", title: `Wallet “${w.label}” is ready`, description: "Pick an event to get started." });
-          }}
+          onClick={() => connectMetaMask().catch(() => {})}
         >
-          Create demo wallet
+          Connect MetaMask
         </Button>
       </div>
       <DemoAccounts className="border-t border-border bg-surface-alt/50 px-6 py-4 sm:px-8" />
@@ -127,7 +123,7 @@ function EventCard({ event }: { event: EventSummary }) {
             <Badge tone="danger">Sold out</Badge>
           ) : (
             <span className="shrink-0 text-sm text-muted">
-              from <strong className="text-base text-foreground">{minPrice > 0 ? formatUsdc(minPrice) : "Free"}</strong>
+              from <strong className="text-base text-foreground">{minPrice > 0 ? formatEth(minPrice) : "Free"}</strong>
             </span>
           )}
         </div>

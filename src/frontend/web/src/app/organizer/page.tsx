@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type EventDetail } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { dateParts, formatUsdc } from "@/lib/format";
+import { dateParts, formatEth } from "@/lib/format";
 import { Badge, Button, Card, EmptyState, Field, Notice, PageHeader, PageSpinner, TicketIcon, inputClass } from "@/components/ui";
 import { ExplorerLink } from "@/components/OnChain";
 import { RoleGate } from "@/components/RoleGate";
@@ -150,7 +150,7 @@ function EventStats({ event, onCancel }: { event: EventDetail; onCancel: () => v
       <div className="grid grid-cols-1 gap-px border-y border-border bg-border sm:grid-cols-3">
         <Stat label="Tickets sold" value={sold.toLocaleString()} sub={`of ${supply.toLocaleString()} (${supply ? Math.round((sold / supply) * 100) : 0}%)`} />
         <Stat label="Checked in" value={redeemed.toLocaleString()} sub={sold ? `${Math.round((redeemed / sold) * 100)}% of sold` : "No tickets sold yet"} />
-        <Stat label="Revenue" value={`${formatUsdc(revenue)}`} sub="USDC" />
+        <Stat label="Revenue" value={`${formatEth(revenue)}`} sub="ETH" />
       </div>
 
       <div className="overflow-x-auto">
@@ -170,7 +170,7 @@ function EventStats({ event, onCancel }: { event: EventDetail; onCancel: () => v
               return (
                 <tr key={t.id} className="border-t border-border">
                   <td className="px-5 py-3 font-medium sm:px-6">{t.name}</td>
-                  <td className="px-3 py-3 tabular-nums">{formatUsdc(t.priceUsdc)}</td>
+                  <td className="px-3 py-3 tabular-nums">{formatEth(t.priceUsdc)}</td>
                   <td className="px-3 py-3">
                     <div className="flex items-center gap-3">
                       <span className="w-20 tabular-nums">
@@ -182,7 +182,7 @@ function EventStats({ event, onCancel }: { event: EventDetail; onCancel: () => v
                     </div>
                   </td>
                   <td className="px-3 py-3 tabular-nums">{t.redeemedCount}</td>
-                  <td className="px-5 py-3 text-right tabular-nums sm:px-6">{formatUsdc(t.ticketsSold * t.priceUsdc)}</td>
+                  <td className="px-5 py-3 text-right tabular-nums sm:px-6">{formatEth(t.ticketsSold * t.priceUsdc)}</td>
                 </tr>
               );
             })}
@@ -283,7 +283,7 @@ function CreateEventForm({ onCreated, onCancel }: { onCreated: (name: string) =>
                   <input id={`tier-name-${i}`} required value={t.name} onChange={(e) => update(i, "name", e.target.value)} className={inputClass} />
                 </Field>
                 <div className="col-span-2 grid grid-cols-2 gap-2 sm:contents">
-                  <Field label="Price (USDC)" htmlFor={`tier-price-${i}`}>
+                  <Field label="Price (ETH)" htmlFor={`tier-price-${i}`}>
                     <input id={`tier-price-${i}`} required type="number" min={0} step="0.01" value={t.priceUsdc} onChange={(e) => update(i, "priceUsdc", e.target.value)} className={inputClass} />
                   </Field>
                   <Field label="Quantity" htmlFor={`tier-supply-${i}`}>

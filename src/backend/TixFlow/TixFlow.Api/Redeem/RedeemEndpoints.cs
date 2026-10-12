@@ -14,24 +14,17 @@ namespace TixFlow.Api.Redeem;
 public static class RedeemEndpoints
 {
     private const int ChallengeTtlSeconds = 60;
-    private const string NotAssigned = "You are not assigned to scan tickets for this event.";
+    private const string NotAvailable = "This event is not available for scanning.";
 
     // Door staff only. Responses carry ticket validity, tier and event, and never who the holder is.
     public static void MapRedeemEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/redeem").WithTags("Redeem").RequireAuthorization(Policies.Staff);
 
-        // Events this staff member may scan, with check-in progress.
+        // Staff may scan tickets for every active event, with check-in progress.
         group.MapGet("/events", async (ClaimsPrincipal user, TixFlowDbContext db) =>
         {
-            var userId = user.UserId();
-            var assigned = user.IsAdmin()
-                ? []
-                : await db.StaffAssignments.Where(a => a.UserId == userId).Select(a => a.EventId).ToListAsync();
-
             var query = db.Events.Where(e => e.CancelledAt == null);
-            if (assigned.Count > 0)
-                query = query.Where(e => assigned.Contains(e.Id));
 
             var events = await query
                 .OrderBy(e => e.StartsAt)
@@ -46,7 +39,7 @@ public static class RedeemEndpoints
                 })
                 .ToListAsync();
 
-            return Results.Ok(new { scopedToAssignments = assigned.Count > 0, events });
+            return Results.Ok(new { scopedToAssignments = false, events });
         });
 
         group.MapPost("/{ticketId:guid}/challenge", async (
@@ -72,7 +65,7 @@ public static class RedeemEndpoints
                 return Results.NotFound(new { message = "Ticket not found." });
 
             if (!await db.CanScanAsync(user, ticket.EventId))
-                return Results.Json(new { message = NotAssigned }, statusCode: 403);
+                return Results.Json(new { message = NotAvailable }, statusCode: 403);
 
             if (ticket.Cancelled)
                 return Results.Conflict(new { message = "This event was cancelled." });
@@ -118,7 +111,7 @@ public static class RedeemEndpoints
             // Checked before the challenge is consumed, so an unassigned scanner cannot burn it.
             var eventId = ticket.TicketTier.EventId;
             if (!await db.CanScanAsync(user, eventId))
-                return Results.Json(new { message = NotAssigned }, statusCode: 403);
+                return Results.Json(new { message = NotAvailable }, statusCode: 403);
 
             var storedChallenge = await challenges.ConsumeAsync(ticketId);
 
@@ -190,7 +183,7 @@ public static class RedeemEndpoints
             if (evt is null)
                 return Results.NotFound(new { message = "Event not found." });
             if (!await db.CanScanAsync(user, eventId))
-                return Results.Json(new { message = NotAssigned }, statusCode: 403);
+                return Results.Json(new { message = NotAvailable }, statusCode: 403);
 
             return Results.Ok(new
             {

@@ -9,6 +9,7 @@ import { formatCountdown, shortAddress } from "@/lib/format";
 import { CameraScanner } from "@/components/CameraScanner";
 import { Avatar, Button, Card, CheckIcon, PageHeader, Spinner, XIcon, inputClass } from "@/components/ui";
 import { RoleGate } from "@/components/RoleGate";
+import { requestMetaMaskAccounts, signMetaMaskMessage } from "@/lib/metamask";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -120,7 +121,7 @@ function Scanner() {
       setState({ phase: "challenging", ticketId });
       try {
         const res = await api.requestChallenge(ticketId);
-        setSigner(holderAddress ?? wallets.find((w) => w.address !== wallet?.address)?.address ?? wallet?.address ?? "");
+        setSigner(holderAddress ?? "metamask");
         setState({
           phase: "signing",
           ticketId,
@@ -137,11 +138,12 @@ function Scanner() {
   );
 
   const sign = async (ticketId: string, challenge: string) => {
-    const holder = wallets.find((x) => x.address === signer);
-    if (!holder) return;
     setState({ phase: "verifying", ticketId });
     try {
-      const signature = await privateKeyToAccount(holder.privateKey).signMessage({ message: challenge });
+      const holder = wallets.find((x) => x.address === signer);
+      const signature = holder?.privateKey
+        ? await privateKeyToAccount(holder.privateKey).signMessage({ message: challenge })
+        : await signMetaMaskMessage((await requestMetaMaskAccounts())[0], challenge);
       const res = await api.confirmRedeem(ticketId, challenge, signature);
       setState({ phase: "admitted", ticketId, eventName: res.eventName, tierName: res.tierName, checkedIn: res.checkedIn, sold: res.sold });
     } catch (err) {
@@ -239,9 +241,9 @@ function Scanner() {
                 {state.tierName} · {state.eventName}
               </p>
               <h2 className="mt-1 font-display text-2xl font-bold">Holder signs to prove ownership</h2>
-              <p className="mt-2 text-sm text-muted">
-                At a real venue the holder signs on their own phone. In this demo, pick which wallet in this browser signs.
-                Choose one that doesn&apos;t own the ticket to see a rejection.
+                 <p className="mt-2 text-sm text-muted">
+                 At a real venue the holder signs on their own phone. Use a local demo holder or the connected MetaMask account.
+                 A different wallet is rejected.
               </p>
 
               <div className="mt-5 rounded-xl bg-surface-alt p-3">
@@ -255,6 +257,12 @@ function Scanner() {
               <fieldset className="mt-5">
                 <legend className="mb-2 text-sm font-medium">Signing wallet</legend>
                 <div className="space-y-2">
+                  <label className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 p-3 ${signer === "metamask" ? "border-accent" : "border-border"}`}>
+                    <input type="radio" name="signer" className="sr-only" checked={signer === "metamask"} onChange={() => setSigner("metamask")} />
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-bold text-white">M</span>
+                    <span className="flex-1 font-medium">Connected MetaMask</span>
+                    <span className="text-xs text-muted">Ticket holder</span>
+                  </label>
                   {wallets.map((w) => (
                     <label
                       key={w.address}

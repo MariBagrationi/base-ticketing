@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import {
   createPublicClient,
   createWalletClient,
+  custom,
   defineChain,
   http,
   parseSignature,
@@ -13,6 +14,7 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { api, type EnabledChainConfig, type PaymentAuthorization, type VoucherResponse } from "./api";
 import { escrowAbi, ticketAbi, usdcAbi } from "./abis";
+import { getEthereumProvider } from "./metamask";
 
 interface ChainState {
   /** Null while loading, and when the backend runs without a chain (simulated minting). */
@@ -120,18 +122,37 @@ export function usdcBalance(config: EnabledChainConfig, client: PublicClient, ad
  * Signs an EIP-3009 `receiveWithAuthorization` for exactly `amount`, payable only to the escrow contract.
  * Signing is local and free; the backend relays it, so the buyer needs no gas.
  */
+// ---------------------------------------------------------------------------
+// Writing from the buyer's own wallet
+// ---------------------------------------------------------------------------
+
+export interface WalletSigner {
+  address: `0x${string}`;
+  privateKey?: `0x${string}`;
+}
+
+function walletClient(config: EnabledChainConfig, signer: WalletSigner) {
+  const chain = defineChain({
+    id: config.chainId,
+    name: nameOf(config.chainId),
+    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+    rpcUrls: { default: { http: [config.rpcUrl] } },
+  });
+  return signer.privateKey
+    ? createWalletClient({ account: privateKeyToAccount(signer.privateKey), chain, transport: http(config.rpcUrl) })
+    : createWalletClient({ account: signer.address, chain, transport: custom(getEthereumProvider() as never) });
+}
+
 export async function signPayment(
   config: EnabledChainConfig,
-  client: PublicClient,
-  privateKey: `0x${string}`,
+  _client: PublicClient,
+  signer: WalletSigner,
   amount: bigint
 ): Promise<PaymentAuthorization> {
-  const account = privateKeyToAccount(privateKey);
-  const domain = await usdcDomain(config, client);
+  const domain = await usdcDomain(config, _client);
   const validBefore = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
   const nonce = toHex(crypto.getRandomValues(new Uint8Array(32)));
-
-  const signature = await account.signTypedData({
+  const signature = await walletClient(config, signer).signTypedData({
     domain: { ...domain, chainId: config.chainId, verifyingContract: config.contracts.usdc },
     types: {
       ReceiveWithAuthorization: [
@@ -145,7 +166,7 @@ export async function signPayment(
     },
     primaryType: "ReceiveWithAuthorization",
     message: {
-      from: account.address,
+      from: signer.address,
       to: config.contracts.eventEscrow,
       value: amount,
       validAfter: 0n,
@@ -157,26 +178,12 @@ export async function signPayment(
   return { validAfter: 0, validBefore, nonce, signature };
 }
 
-// ---------------------------------------------------------------------------
-// Writing from the buyer's own wallet
-// ---------------------------------------------------------------------------
-
-function walletClient(config: EnabledChainConfig, privateKey: `0x${string}`) {
-  const chain = defineChain({
-    id: config.chainId,
-    name: nameOf(config.chainId),
-    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-    rpcUrls: { default: { http: [config.rpcUrl] } },
-  });
-  return createWalletClient({ account: privateKeyToAccount(privateKey), chain, transport: http(config.rpcUrl) });
-}
-
 /**
  * Mints a confirmed order from the buyer's own wallet using the backend-signed voucher. This is what makes
  * a purchase redeemable even when TixFlow's mint worker is down. The buyer pays the gas.
  */
-export async function claimWithVoucher(config: EnabledChainConfig, privateKey: `0x${string}`, v: VoucherResponse) {
-  const wallet = walletClient(config, privateKey);
+export async function claimWithVoucher(config: EnabledChainConfig, signer: WalletSigner, v: VoucherResponse) {
+  const wallet = walletClient(config, signer);
   const voucher = {
     buyer: v.voucher.buyer,
     tierId: BigInt(v.voucher.tierId),

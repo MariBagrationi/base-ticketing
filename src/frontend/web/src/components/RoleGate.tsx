@@ -12,12 +12,12 @@ const copy: Record<Need, { title: string; body: string; roles: Role[] }> = {
   buyer: {
     title: "This area is for ticket buyers",
     body: "Queueing, checkout and tickets belong to wallets with the User role. Door staff accounts can't buy tickets.",
-    roles: ["User", "Admin"],
+    roles: ["User"],
   },
   staff: {
     title: "The door scanner is for venue staff",
-    body: "Only wallets with the Staff or Admin role can scan and check in tickets. An admin can grant the Staff role on the Admin page.",
-    roles: ["Staff", "Admin"],
+    body: "Only wallets with the Staff role can scan and check in tickets. Staff can scan tickets from every active event.",
+    roles: ["Staff"],
   },
   admin: {
     title: "This area is for administrators",

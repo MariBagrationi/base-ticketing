@@ -20,8 +20,9 @@ public static class Policies
 
     public static void AddTixFlowPolicies(this AuthorizationOptions options)
     {
-        options.AddPolicy(User, p => p.RequireRole(nameof(Role.User), nameof(Role.Admin)));
-        options.AddPolicy(Staff, p => p.RequireRole(nameof(Role.Staff), nameof(Role.Admin)));
+        options.AddPolicy(User, p => p.RequireAssertion(context =>
+            context.User.IsInRole(nameof(Role.User)) && !context.User.IsInRole(nameof(Role.Admin))));
+        options.AddPolicy(Staff, p => p.RequireRole(nameof(Role.Staff)));
         options.AddPolicy(Admin, p => p.RequireRole(nameof(Role.Admin)));
     }
 }
@@ -48,11 +49,7 @@ public static class StaffScope
     /// </summary>
     public static async Task<bool> CanScanAsync(this TixFlowDbContext db, ClaimsPrincipal user, Guid eventId)
     {
-        if (user.IsAdmin()) return true;
         if (!user.Has(Role.Staff)) return false;
-
-        var userId = user.UserId();
-        var assigned = await db.StaffAssignments.Where(a => a.UserId == userId).Select(a => a.EventId).ToListAsync();
-        return assigned.Count == 0 || assigned.Contains(eventId);
+        return await db.Events.AnyAsync(e => e.Id == eventId && e.CancelledAt == null);
     }
 }

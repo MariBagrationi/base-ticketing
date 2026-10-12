@@ -11,7 +11,6 @@ const links: { href: string; label: string; show: Audience; match: (p: string) =
   { href: "/", label: "Events", show: "all", match: (p) => p === "/" || p.startsWith("/event") || p.startsWith("/checkout") },
   { href: "/tickets", label: "My tickets", show: "buyer", match: (p) => p.startsWith("/tickets") },
   { href: "/scanner", label: "Door scanner", show: "staff", match: (p) => p.startsWith("/scanner") },
-  { href: "/organizer", label: "Organizer", show: "admin", match: (p) => p.startsWith("/organizer") },
   { href: "/admin", label: "Admin", show: "admin", match: (p) => p.startsWith("/admin") },
 ];
 
@@ -19,14 +18,15 @@ export function Header() {
   const pathname = usePathname() ?? "/";
   const { status, isAdmin, isStaff, isBuyer } = useAuth();
 
-  // Navigation follows the roles of the active wallet. Before sign-in only the buyer view is offered.
+  // Staff and Admin accounts use dedicated workspaces; buyer navigation is only for ordinary users.
   const signedIn = status === "ready";
   const visible = links.filter(
-    (l) =>
-      l.show === "all" ||
-      (l.show === "buyer" && (!signedIn || isBuyer)) ||
-      (l.show === "staff" && signedIn && isStaff) ||
-      (l.show === "admin" && signedIn && isAdmin)
+    (l) => {
+      if (!signedIn) return l.show === "all";
+      if (isStaff) return l.show === "staff";
+      if (isAdmin) return l.show === "all" || l.show === "admin";
+      return l.show === "all" || (l.show === "buyer" && isBuyer);
+    }
   );
 
   return (
