@@ -76,7 +76,7 @@ public static class DemoEventSeeder
 
             General Admission covers the upper tiers with a full view of the stage. Pit Standing puts you right at the barrier. VIP Terrace includes a private bar, reserved seating overlooking the stage, and a limited screen-printed poster. Every ticket is an NFT on Base and can only be resold for up to 10% above face value, so scalpers have nothing to gain.
             """,
-            [new("General Admission", 45m, 1200), new("Pit Standing", 85m, 300), new("VIP Terrace", 160m, 60)]),
+            [new("General Admission", 0.03m, 1200), new("Pit Standing", 0.055m, 300), new("VIP Terrace", 0.12m, 60)]),
 
         new(Guid.Parse("a1e0c001-5eed-4000-8000-000000000002"),
             "Base Camp 2026: Onchain Builders Summit",
@@ -89,7 +89,7 @@ public static class DemoEventSeeder
 
             Builder Pass includes both days, all workshops, lunch and the evening social. Founder Pass adds reserved front-row seating, a private office-hours slot with speakers, and the investor dinner. Student Pass covers both days and requires a valid student ID at the door. Wi-Fi, power at every seat, and good coffee are guaranteed.
             """,
-            [new("Student Pass", 29m, 200), new("Builder Pass", 149m, 800), new("Founder Pass", 399m, 120)]),
+            [new("Student Pass", 0.02m, 200), new("Builder Pass", 0.1m, 800), new("Founder Pass", 0.35m, 120)]),
 
         new(Guid.Parse("a1e0c001-5eed-4000-8000-000000000003"),
             "Symphony of Distortion: Rock Classics Live with Orchestra",
@@ -102,7 +102,7 @@ public static class DemoEventSeeder
 
             Balcony seats offer the best view of the full orchestra. Stalls put you close enough to feel the timpani. Box Seats are private four-person boxes with table service and a glass of sparkling wine at the interval. Smart-casual dress is suggested but not required. Latecomers are seated at the interval only.
             """,
-            [new("Balcony", 40m, 400), new("Stalls", 75m, 600), new("Box Seats", 220m, 40)]),
+            [new("Balcony", 0.025m, 400), new("Stalls", 0.05m, 600), new("Box Seats", 0.18m, 40)]),
 
         new(Guid.Parse("a1e0c001-5eed-4000-8000-000000000004"),
             "Velocity Cup 2026: Esports Grand Final",
@@ -115,7 +115,7 @@ public static class DemoEventSeeder
 
             Upper Bowl seats see the whole stage and screen. Lower Bowl puts you close to the players' booths. Front Row + Meet & Greet includes floor seating, a signed team jersey, and a post-match photo session with the winning roster. The arena is all-ages; under-14s must be accompanied by an adult.
             """,
-            [new("Upper Bowl", 20m, 3000), new("Lower Bowl", 55m, 1500), new("Front Row + Meet & Greet", 180m, 80)]),
+            [new("Upper Bowl", 0.015m, 3000), new("Lower Bowl", 0.04m, 1500), new("Front Row + Meet & Greet", 0.15m, 80)]),
 
         new(Guid.Parse("a1e0c001-5eed-4000-8000-000000000005"),
             "Late Night Laughs: Stand-Up Showcase",
@@ -128,7 +128,7 @@ public static class DemoEventSeeder
 
             Standard seats are first come, first served from doors at 9:30 PM. Front Tables are reserved for groups and sit right by the stage; anyone in them should expect to be part of the show. Strictly 18+. Phones stay in pockets: filming is not allowed, so the jokes can stay rough around the edges.
             """,
-            [new("Standard", 18m, 150), new("Front Tables", 30m, 40)]),
+            [new("Standard", 0.012m, 150), new("Front Tables", 0.02m, 40)]),
 
         new(Guid.Parse("a1e0c001-5eed-4000-8000-000000000006"),
             "Harvest Table: Wine & Food Festival",
@@ -141,7 +141,7 @@ public static class DemoEventSeeder
 
             The Day Pass includes entry, a tasting glass and five tasting tokens. The Tasting Pass adds unlimited pours at every stand and a guided masterclass with a winemaker. The Winemaker's Dinner is a 48-seat candlelit supper in the estate cellar, with six courses paired with rare library wines. Shuttle buses run from the city centre from 9 AM.
             """,
-            [new("Day Pass", 35m, 800), new("Tasting Pass", 70m, 300), new("Winemaker's Dinner", 190m, 48)]),
+            [new("Day Pass", 0.025m, 800), new("Tasting Pass", 0.05m, 300), new("Winemaker's Dinner", 0.14m, 48)]),
 
         new(Guid.Parse("a1e0c001-5eed-4000-8000-000000000007"),
             "Kinetic: Contemporary Dance Premiere",
@@ -154,6 +154,6 @@ public static class DemoEventSeeder
 
             The studio is an intimate black-box space with raked seating on three sides, so there are no bad seats. Premium tickets are in the first two rows and include the printed programme and a drink at the post-show talk. The performance contains strobe lighting and loud passages of sound.
             """,
-            [new("Standard", 28m, 220), new("Premium", 48m, 80)])
+            [new("Standard", 0.02m, 220), new("Premium", 0.035m, 80)])
     ];
 }
