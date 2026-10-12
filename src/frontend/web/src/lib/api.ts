@@ -129,11 +129,6 @@ export const api = {
 
   getVoucher: (orderId: string) => request<VoucherResponse>(`/orders/${orderId}/voucher`),
 
-  getAttendanceProof: (ticketId: string) =>
-    request<{ ticketContract: string; tokenId: string; root: string; proof: `0x${string}`[]; alreadyClaimed: boolean }>(
-      `/tickets/${ticketId}/attendance-proof`
-    ),
-
   getChainHealth: () => request<ChainHealth>("/health/chain"),
 
   /** Fetched once per page load; a failed request is retried on the next call. */

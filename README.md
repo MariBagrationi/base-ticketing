@@ -4,7 +4,7 @@
 
 TixFlow sells tickets the way a sold-out drop should work: buyers wait in a fair first-come queue instead of fighting bots, check out inside a short admission window, and receive an ERC-721 ticket on Base. At the door, the holder proves ownership by signing a one-time challenge, so screenshots and copied QR codes don't get anyone in.
 
-The project runs fully offline in **demo mode**: wallets are generated in the browser (no MetaMask needed), payments are simulated, and NFT minting is simulated by the API so the whole flow completes in seconds without a blockchain connection.
+The project runs fully offline in **demo mode**: buyers sign in with MetaMask using a signature only (no funds and no network needed), payments are simulated, and NFT minting is simulated by the API so the whole flow completes in seconds without a blockchain connection.
 
 
 ---
@@ -37,7 +37,7 @@ cd base-ticketing
 docker compose up --build
 ```
 
-Open **http://localhost:3000** and click **Create demo wallet**. Seven demo events are already listed.
+Open **http://localhost:3000** and click **Connect MetaMask** to sign in as a buyer, or **Use the Admin account** / **Use the Staff account** for the two built-in demo roles. Seven demo events are already listed.
 
 | Service    | URL / address                  |
 |------------|--------------------------------|
@@ -55,14 +55,24 @@ On first start the API applies database migrations and seeds the demo events aut
 
 A complete demo takes about two minutes:
 
-1. **Create a wallet.** Click **Create demo wallet** in the top-right. A private key is generated in the browser and you're signed in with Sign-In with Ethereum (SIWE) automatically. Create a second wallet from the wallet menu to act as an organizer, and switch between them at any time.
-2. **Create an event (optional).** As the organizer wallet, open **Organizer → New event**, fill in the name, venue, date and ticket tiers, and click **Publish event**.
-3. **Join the queue.** As a buyer wallet, open an event and click **Join the queue**. Your position updates live over SignalR. When your batch is admitted you're taken straight to checkout.
+1. **Sign in.** Click **Connect MetaMask** and sign the Sign-In with Ethereum (SIWE) message. It is a signature, not a transaction, so the wallet needs no funds. A wallet's first sign-in gives it the **User** (buyer) role.
+2. **Create an event (optional).** Click **Use the Admin account**, open **Admin → Manage events → New event**, fill in the name, venue, date and ticket tiers, and click **Publish event**.
+3. **Join the queue.** As a buyer, open an event and click **Join the queue**. Your position updates live over SignalR. When your batch is admitted you're taken straight to checkout.
 4. **Reserve.** Choose a tier and quantity (up to 4) before the 5-minute admission window closes, then click **Reserve**.
-5. **Pay.** Click **Pay … USDC**. Payment is simulated in demo mode.
+5. **Pay.** Click **Pay … ETH**. Payment is simulated in demo mode.
 6. **Watch it mint.** The checkout page shows the mint transaction being sent and confirmed. After a few seconds your NFT ticket appears with a token number and QR code. It also shows up under **My tickets**.
-7. **Check in at the door.** Open **Door scanner**, scan the QR code (or pick the ticket from the list if you have no camera), and click **Sign & verify**. A green **Admitted** screen confirms entry. Scan the same ticket again, or sign with a different wallet, to see **Denied**.
-8. **Check the dashboard.** Switch back to the organizer wallet. **Organizer** shows tickets sold, check-ins and revenue per tier, refreshing every few seconds.
+7. **Check in at the door.** Click **Use the Staff account** and open **Door scanner**. Scan the QR code (or pick the ticket from the list if you have no camera), choose the holder's wallet and click **Sign & verify**. A green **Admitted** screen confirms entry. Scan the same ticket again, or sign with a different wallet, to see **Denied**.
+8. **Check the dashboards.** As Admin, **Manage events** shows tickets sold, check-ins and revenue per tier, refreshing every few seconds. The **Admin** page grants and revokes roles, assigns staff to events and shows the audit log.
+
+### Roles
+
+| Role | How a wallet gets it | What it can do |
+|------|----------------------|----------------|
+| **User** | Automatically, on first sign-in | Join queues, buy tickets, see its own tickets |
+| **Staff** | Granted by an admin (optionally limited to specific events) | Door scanner and the live check-in board |
+| **Admin** | Listed in `Auth:AdminWallets` on the server | Create and cancel events, grant and revoke roles, assign staff, read the audit log |
+
+Every endpoint checks the role on the server, and roles are re-read from the database on each request, so a change takes effect immediately. The page-level gates in the web app are only a courtesy.
 
 ### Ticket lifecycle
 
@@ -85,7 +95,7 @@ stateDiagram-v2
 ```mermaid
 flowchart LR
     subgraph Browser
-        W[Next.js web app<br/>demo wallets via viem]
+        W[Next.js web app<br/>MetaMask sign-in, viem]
     end
 
     subgraph API[TixFlow.Api · ASP.NET Core]
@@ -126,7 +136,7 @@ flowchart LR
 
 | Component | Responsibility |
 |-----------|----------------|
-| **Web app** (`src/frontend/web`) | Buyer, organizer and door-scanner UI. Holds demo wallets in `localStorage`, signs SIWE logins and door challenges with viem, and listens for queue updates over SignalR. |
+| **Web app** (`src/frontend/web`) | Buyer, admin and door-scanner UI. Signs SIWE logins and door challenges through MetaMask (or viem for the local demo accounts) and listens for queue updates over SignalR. |
 | **Auth** | Issues single-use nonces, verifies SIWE signatures (EIP-4361 + EIP-191), finds or creates the user by wallet address, and returns a 24-hour JWT. |
 | **Queue + AdmissionWorker** | Each event has a Redis sorted set scored by join time. Every 2 seconds the worker pops the next batch (50 by default), issues each user a signed **admission token** (JWT, 5-minute TTL, single use) and pushes it over SignalR. Joining is rate-limited to 5 requests per 10 seconds per user. |
 | **Checkout** | `reserve` sits behind `AdmissionGateFilter`, which validates the admission token, checks that it belongs to the caller, and marks it consumed in Redis. It also checks the tier, the quantity and the remaining supply. `confirm` marks the order paid and creates one `MintJob` per ticket. |
@@ -225,12 +235,15 @@ With `Chain:Enabled=false` the app runs with no chain at all: `DemoMintWorker` m
 after a few seconds and assigns sequential token numbers. The banner says **Demo mode**. This is what
 you get from a plain `dotnet run` without Anvil.
 
-### Demo wallets
+### Wallets and demo accounts
 
-The web app replaces MetaMask with browser-generated wallets (`src/frontend/web/src/lib/auth.tsx`). Keys
-come from viem's `generatePrivateKey()` and are stored in `localStorage`. They are real secp256k1 keys,
-so SIWE logins, USDC payment authorisations and door challenges are verified exactly as they would be
-for any other wallet. **They are for demos only: never send real funds to them.**
+Buyers connect MetaMask (`src/frontend/web/src/lib/metamask.ts`). The app only ever asks for message
+signatures: the SIWE login and the one-time door challenge.
+
+For local demos the API can also hand out two ready-made accounts, Admin and Staff, when
+`Demo:ExposeAccounts` is `true`. Their keys live in `appsettings.Development.json` under `Demo:Accounts`;
+the web app imports them with one click and keeps them in `localStorage`. **They are test keys for demos
+only: never send real funds to them, and keep `Demo:ExposeAccounts` off on anything public.**
 
 ### Running with a local chain
 
@@ -330,17 +343,19 @@ If the Docker `api` or `web` containers are running, stop them first (`docker co
 
 ## Demo events
 
-The API seeds these events on startup when `Demo:SeedEvents` is `true`. Seeding is idempotent: events have fixed IDs, so restarts never create duplicates. Dates are set relative to the day of first seeding so they're always upcoming. All are owned by a placeholder organizer (`0x…c0ffee`). Events you create yourself appear on your own organizer dashboard.
+The API seeds these events on startup when `Demo:SeedEvents` is `true`. Seeding is idempotent: events have fixed IDs, so restarts never create duplicates. Dates are set relative to the day of first seeding so they're always upcoming. All are owned by `Demo:OrganizerWallet` when it is set, otherwise by a placeholder organizer (`0x…c0ffee`). Events you create yourself appear on your own organizer dashboard.
 
-| Event | Venue | Tiers (USDC) |
+| Event | Venue | Tiers (ETH) |
 |-------|-------|--------------|
-| Neon Arches: Synthwave Under the Stars | Arches Amphitheatre, Old Town | General Admission $45 · Pit Standing $85 · VIP Terrace $160 |
-| Late Night Laughs: Stand-Up Showcase | The Basement Comedy Club | Standard $18 · Front Tables $30 |
-| Base Camp 2026: Onchain Builders Summit | Riverside Convention Hall, Hall B | Student $29 · Builder $149 · Founder $399 |
-| Symphony of Distortion: Rock Classics Live with Orchestra | Grand Philharmonic Hall | Balcony $40 · Stalls $75 · Box Seats $220 |
-| Velocity Cup 2026: Esports Grand Final | Velocity Arena | Upper Bowl $20 · Lower Bowl $55 · Front Row + Meet & Greet $180 |
-| Harvest Table: Wine & Food Festival | Old Vine Estate, Kakheti Valley | Day Pass $35 · Tasting Pass $70 · Winemaker's Dinner $190 |
-| Kinetic: Contemporary Dance Premiere | Studio Theatre No. 9 | Standard $28 · Premium $48 |
+| Neon Arches: Synthwave Under the Stars | Arches Amphitheatre, Old Town | General Admission 0.03 · Pit Standing 0.055 · VIP Terrace 0.12 |
+| Late Night Laughs: Stand-Up Showcase | The Basement Comedy Club | Standard 0.012 · Front Tables 0.02 |
+| Base Camp 2026: Onchain Builders Summit | Riverside Convention Hall, Hall B | Student 0.02 · Builder 0.1 · Founder 0.35 |
+| Symphony of Distortion: Rock Classics Live with Orchestra | Grand Philharmonic Hall | Balcony 0.025 · Stalls 0.05 · Box Seats 0.18 |
+| Velocity Cup 2026: Esports Grand Final | Velocity Arena | Upper Bowl 0.015 · Lower Bowl 0.04 · Front Row + Meet & Greet 0.15 |
+| Harvest Table: Wine & Food Festival | Old Vine Estate, Kakheti Valley | Day Pass 0.025 · Tasting Pass 0.05 · Winemaker's Dinner 0.14 |
+| Kinetic: Contemporary Dance Premiere | Studio Theatre No. 9 | Standard 0.02 · Premium 0.035 |
+
+> **Price units.** The web app shows prices in ETH. The API field and database column are still called `PriceUsdc`, and when a chain is attached the escrow contract settles the same number in USDC (6 decimals). In demo mode no funds move, so this only affects labels.
 
 Each event has a multi-paragraph description. Edit or add events in `src/backend/TixFlow/TixFlow.Api/Demo/DemoEventSeeder.cs`.
 
@@ -530,7 +545,7 @@ base-ticketing/
     └── frontend/web/               Next.js app
         ├── src/app/                Pages: events, event, checkout, tickets, scanner, organizer
         ├── src/components/         Header, WalletMenu, TicketPass, CameraScanner, UI kit, toasts
-        ├── src/lib/                API client, demo wallet and auth provider, formatting
+        ├── src/lib/                API client, MetaMask and auth provider, chain helpers, formatting
         └── Dockerfile
 ```
 

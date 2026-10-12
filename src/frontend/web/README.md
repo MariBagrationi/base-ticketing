@@ -1,6 +1,6 @@
 # TixFlow web app
 
-Next.js 16 frontend for TixFlow: event listing, fair queue, checkout, My tickets, door scanner and organizer dashboard. Wallets are generated in the browser, so no MetaMask is needed.
+Next.js 16 frontend for TixFlow: event listing, fair queue, checkout, My tickets, door scanner and organizer dashboard. Buyers sign in with MetaMask; one-click Admin and Staff demo accounts are available when the API exposes them (local demo setups only).
 
 See the [root README](../../../README.md) for the full flow, architecture and Docker setup.
 
