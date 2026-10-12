@@ -42,8 +42,8 @@ async function main() {
   // Create event
   const eventId = crypto.randomUUID();
   await pgPool.query(
-    `INSERT INTO "Events" ("Id", "Name", "Description", "OrganizerId", "StartsAt", "VenueName")
-     VALUES ($1, $2, $3, $4, NOW() + INTERVAL '30 days', $5)`,
+    `INSERT INTO "Events" ("Id", "Name", "Description", "OrganizerId", "StartsAt", "EndsAt", "VenueName")
+     VALUES ($1, $2, $3, $4, NOW() + INTERVAL '30 days', NOW() + INTERVAL '30 days 6 hours', $5)`,
     [eventId, 'Load Test Concert', 'Load test event for burst traffic simulation', organizerId, 'Colosseum Arena']
   );
 
@@ -52,7 +52,7 @@ async function main() {
   await pgPool.query(
     `INSERT INTO "TicketTiers" ("Id", "EventId", "Name", "PriceUsdc", "TotalSupply")
      VALUES ($1, $2, $3, $4, $5)`,
-    [tierId, eventId, 'General Admission', 25.00, TOTAL_SUPPLY]
+    [tierId, eventId, 'General Admission', 0.02, TOTAL_SUPPLY]
   );
 
   // Create users + JWTs + admission tokens
@@ -68,10 +68,19 @@ async function main() {
       const wallet = '0x' + crypto.randomBytes(20).toString('hex');
 
       // Insert user
+      const userInsert = pgPool.query(
+        `INSERT INTO "Users" ("Id", "WalletAddress", "CreatedAt") VALUES ($1, $2, NOW())`,
+        [userId, wallet]
+      );
+      promises.push(userInsert);
+
+      // Checkout requires the User role, which the API re-reads from the database on every request
       promises.push(
-        pgPool.query(
-          `INSERT INTO "Users" ("Id", "WalletAddress", "CreatedAt") VALUES ($1, $2, NOW())`,
-          [userId, wallet]
+        userInsert.then(() =>
+          pgPool.query(
+            `INSERT INTO "UserRoles" ("UserId", "Role", "GrantedAt") VALUES ($1, 'User', NOW())`,
+            [userId]
+          )
         )
       );
 
