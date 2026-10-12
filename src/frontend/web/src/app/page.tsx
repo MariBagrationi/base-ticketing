@@ -6,7 +6,6 @@ import { api, type EventSummary } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { dateParts, formatEth } from "@/lib/format";
 import { Badge, Button, ButtonLink, EmptyState, Notice, PageHeader, PageSpinner, TicketIcon } from "@/components/ui";
-import { useToast } from "@/components/Toaster";
 import { DemoAccounts } from "@/components/RoleGate";
 
 export default function Home() {

@@ -219,8 +219,8 @@ function CreateEventForm({ onCreated, onCancel }: { onCreated: (name: string) =>
   const [description, setDescription] = useState("");
   const [startsAt, setStartsAt] = useState(defaultStart);
   const [tiers, setTiers] = useState<TierDraft[]>([
-    { name: "General Admission", priceUsdc: "25", totalSupply: "200" },
-    { name: "VIP", priceUsdc: "90", totalSupply: "30" },
+    { name: "General Admission", priceUsdc: "0.02", totalSupply: "200" },
+    { name: "VIP", priceUsdc: "0.08", totalSupply: "30" },
   ]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -284,7 +284,7 @@ function CreateEventForm({ onCreated, onCancel }: { onCreated: (name: string) =>
                 </Field>
                 <div className="col-span-2 grid grid-cols-2 gap-2 sm:contents">
                   <Field label="Price (ETH)" htmlFor={`tier-price-${i}`}>
-                    <input id={`tier-price-${i}`} required type="number" min={0} step="0.01" value={t.priceUsdc} onChange={(e) => update(i, "priceUsdc", e.target.value)} className={inputClass} />
+                    <input id={`tier-price-${i}`} required type="number" min={0} step="0.001" value={t.priceUsdc} onChange={(e) => update(i, "priceUsdc", e.target.value)} className={inputClass} />
                   </Field>
                   <Field label="Quantity" htmlFor={`tier-supply-${i}`}>
                     <input id={`tier-supply-${i}`} required type="number" min={1} step={1} value={t.totalSupply} onChange={(e) => update(i, "totalSupply", e.target.value)} className={inputClass} />

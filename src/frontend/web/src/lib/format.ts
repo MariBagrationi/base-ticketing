@@ -5,7 +5,7 @@ export function shortAddress(address?: string | null) {
 
 export function formatEth(amount: number) {
   return `${amount.toLocaleString("en-US", {
-    minimumFractionDigits: amount > 0 && amount < 1 ? 3 : 0,
+    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
     maximumFractionDigits: 4,
   })} ETH`;
 }
@@ -13,13 +13,6 @@ export function formatEth(amount: number) {
 export function shortHash(hash?: string | null) {
   if (!hash) return "";
   return `${hash.slice(0, 10)}…${hash.slice(-6)}`;
-}
-
-export function formatUsdc(amount: number) {
-  return `$${amount.toLocaleString("en-US", {
-    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
-    maximumFractionDigits: 2,
-  })}`;
 }
 
 export function dateParts(iso: string) {
