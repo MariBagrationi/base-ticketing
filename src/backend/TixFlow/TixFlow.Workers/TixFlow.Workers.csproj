@@ -4,7 +4,6 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <OutputType>Exe</OutputType>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,10 +15,5 @@
     <ProjectReference Include="..\TixFlow.Domain\TixFlow.Domain.csproj" />
     <ProjectReference Include="..\TixFlow.Infrastructure\TixFlow.Infrastructure.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Include="Contract\EventTicketAbi.json" />
-  </ItemGroup>
-
 
 </Project>

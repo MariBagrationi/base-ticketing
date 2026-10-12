@@ -7,14 +7,20 @@ namespace TixFlow.Api.Demo;
 // Idempotent: events are keyed by fixed IDs, so restarting the API never duplicates them.
 public static class DemoEventSeeder
 {
-    private const string OrganizerWallet = "0x0000000000000000000000000000000000c0ffee";
+    public const string PlaceholderOrganizerWallet = "0x0000000000000000000000000000000000c0ffee";
+    private static readonly TimeSpan EventDuration = TimeSpan.FromHours(6);
 
-    public static async Task SeedAsync(TixFlowDbContext db, ILogger logger)
+    /// <param name="organizerWallet">Wallet that organizes the seeded events and receives their escrow payouts.</param>
+    public static async Task SeedAsync(TixFlowDbContext db, ILogger logger, string? organizerWallet = null)
     {
-        var organizer = await db.Users.FirstOrDefaultAsync(u => u.WalletAddress == OrganizerWallet);
+        var wallet = string.IsNullOrWhiteSpace(organizerWallet)
+            ? PlaceholderOrganizerWallet
+            : organizerWallet.Trim().ToLowerInvariant();
+
+        var organizer = await db.Users.FirstOrDefaultAsync(u => u.WalletAddress == wallet);
         if (organizer is null)
         {
-            organizer = new User { Id = Guid.NewGuid(), WalletAddress = OrganizerWallet, CreatedAt = DateTimeOffset.UtcNow };
+            organizer = new User { Id = Guid.NewGuid(), WalletAddress = wallet, CreatedAt = DateTimeOffset.UtcNow };
             db.Users.Add(organizer);
         }
 
@@ -32,14 +38,17 @@ public static class DemoEventSeeder
                 VenueName = seed.Venue,
                 Description = seed.Description.Trim(),
                 StartsAt = today.AddDays(seed.DaysFromNow).AddHours(seed.HourUtc),
+                EndsAt = today.AddDays(seed.DaysFromNow).AddHours(seed.HourUtc) + EventDuration,
                 OrganizerId = organizer.Id,
-                TicketTiers = seed.Tiers.Select(t => new TicketTier
+                TicketTiers = seed.Tiers.Select((t, index) => new TicketTier
                 {
                     Id = Guid.NewGuid(),
                     EventId = seed.Id,
                     Name = t.Name,
                     PriceUsdc = t.Price,
-                    TotalSupply = t.Supply
+                    TotalSupply = t.Supply,
+                    OnChainTierId = index + 1,
+                    MaxPerWallet = TicketTier.DefaultMaxPerWallet
                 }).ToList()
             });
             added++;

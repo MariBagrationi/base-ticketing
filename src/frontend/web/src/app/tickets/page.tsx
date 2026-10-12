@@ -68,7 +68,7 @@ export default function TicketsPage() {
               <h2 className="mb-4 font-display text-lg font-bold">Upcoming · {upcoming.length}</h2>
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {upcoming.map((t) => (
-                  <TicketPass key={t.id} ticket={t} />
+                  <TicketPass key={t.id} ticket={t} walletAddress={wallet?.address} />
                 ))}
               </div>
             </section>
@@ -78,7 +78,7 @@ export default function TicketsPage() {
               <h2 className="mb-4 font-display text-lg font-bold text-muted">Checked in · {used.length}</h2>
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {used.map((t) => (
-                  <TicketPass key={t.id} ticket={t} />
+                  <TicketPass key={t.id} ticket={t} walletAddress={wallet?.address} />
                 ))}
               </div>
             </section>

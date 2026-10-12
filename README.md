@@ -6,6 +6,7 @@ TixFlow sells tickets the way a sold-out drop should work: buyers wait in a fair
 
 The project runs fully offline in **demo mode**: wallets are generated in the browser (no MetaMask needed), payments are simulated, and NFT minting is simulated by the API so the whole flow completes in seconds without a blockchain connection.
 
+
 ---
 
 ## Contents
@@ -13,7 +14,7 @@ The project runs fully offline in **demo mode**: wallets are generated in the br
 - [Quick start (Docker)](#quick-start-docker)
 - [The user flow](#the-user-flow)
 - [Architecture](#architecture)
-- [How minting works](#how-minting-works)
+- [On-chain protocol](#on-chain-protocol)
 - [Tech stack](#tech-stack)
 - [Running the project](#running-the-project)
 - [Demo events](#demo-events)
@@ -168,39 +169,95 @@ sequenceDiagram
 
 ---
 
-## How minting works
+## On-chain protocol
 
-Minting is asynchronous: confirming an order only writes `MintJob` rows, so checkout stays fast no matter how busy the chain is. Something else turns those jobs into tokens. There are two interchangeable implementations.
+ASP.NET Core is the checkout system; Base is the receipt and settlement layer. A purchase is confirmed in
+Postgres in milliseconds and never waits for the chain. Everything that must not depend on trusting
+TixFlow is enforced by contracts in [`src/contracts`](src/contracts) (Solidity 0.8.24, OpenZeppelin v5).
 
-### Demo mode: `DemoMintWorker` (default for local and Docker)
+| Contract | Purpose | Key security properties |
+|----------|---------|-------------------------|
+| `TicketFactory` | Deploys one `EventTicket` per event as an EIP-1167 minimal proxy at a deterministic address | An event can only be deployed once; creating an event costs about 760k gas, against 3.9M just to deploy the bytecode once more (83% less per event) |
+| `EventTicket` | ERC-721 tickets for one event: tiers, supply caps, per-wallet limits, transfer lock, ERC-2981 royalties, fully on-chain SVG metadata | Limits are enforced in the contract, so calling it directly gains nothing; tickets move only through the capped marketplace until the event ends; redeemed tickets are soulbound |
+| `EventEscrow` | Holds primary-sale USDC until the event ends | The organizer is paid only after `eventEnd`; if the event is cancelled every holder can pull a full refund; nobody, including TixFlow, can withdraw to themselves |
+| `PriceCappedResale` | Escrowed secondary market | Price can never exceed face value plus 10% (hard ceiling 50%); royalty and payment settle atomically with the transfer |
+| `TicketRenderer` | Renders token metadata and artwork on-chain | No server or IPFS needed; names are escaped |
+| `SignatureValidator` | ERC-1271 / ERC-6492 signature checks | Lets Coinbase Smart Wallet users sign in |
 
-Enabled when `Demo:SimulateMint` is `true` (set in `appsettings.Development.json`). It runs inside the API process (`TixFlow.Api/Demo/DemoMintWorker.cs`) and polls the database every second:
+Roles use `AccessControlDefaultAdminRules` (two-step, delayed admin transfer): `MINTER_ROLE` and
+`REDEEMER_ROLE` for the backend relayer, `PAUSER_ROLE` for emergencies, and `CANCELLER_ROLE` on the
+escrow. See [THREAT_MODEL.md](THREAT_MODEL.md) for what each key can and cannot do if it leaks.
 
-| Step | Condition | What it does |
-|------|-----------|--------------|
-| 1. Submit | `MintJob` is `Pending` and at least 1 second old | Sets the job to `Submitted` and stores a random 32-byte transaction hash (`0x…`) |
-| 2. Confirm | `MintJob` has been `Submitted` for at least 3 seconds | Sets the job to `Confirmed`, the ticket to `Minted`, and assigns the next sequential token ID (`max(TokenId) + 1`) |
+### How a purchase settles
 
-It writes exactly the same states as the real pipeline, so the frontend, the scanner and the organizer dashboard behave identically. `GET /health/chain` reports `"status": "Simulated"`, and the web app shows a **Demo mode** strip at the top of every page.
+1. **Checkout (off-chain, instant).** At "Pay" the buyer's wallet signs an EIP-3009
+   `receiveWithAuthorization` for the order total, payable only to the escrow. Signing is local and
+   costs no gas. `/checkout/confirm` stores the signature with the order and returns.
+2. **Settlement (on-chain, asynchronous).** The mint worker signs an EIP-712 **mint voucher** for the
+   order and calls `EventEscrow.purchaseWithAuthorization`. In one transaction the USDC moves from the
+   buyer into escrow and the tickets are minted to the buyer.
+3. **Indexing.** The indexer reads the `Minted` log, matches it to the order by its nonce, and records
+   token IDs. The chain, not the database, is the source of truth for what was minted.
 
-> Don't run `TixFlow.Workers` against the same database while `Demo:SimulateMint` is on. Both would pick up the same jobs.
+Every order has one nonce (its ID as a 128-bit number) that both mint paths burn, so an order can never
+be minted twice.
 
-### Production: `TixFlow.Workers`
+**Your purchase is provable even if our worker is down.** `GET /orders/{id}/voucher` returns the signed
+voucher. The checkout page's "Mint it myself" button submits it from the buyer's own wallet. When the
+worker comes back it sees the nonce is used and skips the order.
 
-A separate .NET worker process with two background services:
+### Proof of attendance
 
-1. **MintWorker** polls `Pending` jobs every 5 seconds (up to 20 per batch). A single-writer `NonceService` hands out transaction nonces so concurrent mints never collide. It calls `EventTicket.mint(to)` for one ticket or `mintBatch(addresses)` for several via Nethereum. Jobs move to `Submitted` with the transaction hash. Failures are retried up to 3 times, then marked `Failed`.
-2. **ChainIndexer** reads `Transfer` events from the zero address (mints) in block ranges, waiting for 2 confirmation blocks. Each event is matched to its job by transaction hash, and the ticket becomes `Minted` with the on-chain token ID. A checkpoint (last block and its hash) is stored in Postgres:
-   - **Reorg handling.** If the stored block hash no longer matches the chain, the checkpoint rewinds 15 blocks and recently confirmed jobs revert to `Submitted` until they are re-observed.
-   - **Stuck transactions.** Jobs `Submitted` for more than 5 minutes go back to `Pending` and are resubmitted.
+Door entry is decided off-chain by a signed challenge and never waits for the chain. Afterwards the
+worker publishes a Merkle root of all redeemed tickets (`checkpointRedemptions`) and relays
+`claimAttendanceBadge` for each holder. The ticket then becomes a soulbound badge: its on-chain artwork
+changes and it can never be transferred again.
 
-To mint for real: deploy `EventTicket` with Foundry (`src/contracts/script/Deploy.s.sol`), set `Mint:RpcUrl`, `Mint:PrivateKey` and `Mint:ContractAddress` in `TixFlow.Workers/appsettings.json` (or environment variables), set `Demo:SimulateMint=false` and `Rpc:BaseUrl` for the API, and run `dotnet run --project src/backend/TixFlow/TixFlow.Workers`.
+### Smart wallets
+
+Sign-in accepts ordinary wallet signatures offline. If that check fails and a chain is configured, the
+backend asks `SignatureValidator` through a read-only call, which covers deployed smart wallets
+(ERC-1271) and not-yet-deployed ones (ERC-6492). A paymaster is not built yet; see the roadmap.
+
+### Simulated mode
+
+With `Chain:Enabled=false` the app runs with no chain at all: `DemoMintWorker` marks tickets as minted
+after a few seconds and assigns sequential token numbers. The banner says **Demo mode**. This is what
+you get from a plain `dotnet run` without Anvil.
 
 ### Demo wallets
 
-The web app replaces MetaMask with browser-generated wallets (`src/frontend/web/src/lib/auth.tsx`). Keys come from viem's `generatePrivateKey()` and are stored in `localStorage` with a label (Buyer, Organizer, …). Selecting a wallet signs a SIWE message and stores the JWT for that wallet, so switching is instant and reloading keeps you signed in. The keys are real secp256k1 keys, which means the backend verifies signatures exactly as it would for MetaMask. **They are for demos only: never send real funds to them.**
+The web app replaces MetaMask with browser-generated wallets (`src/frontend/web/src/lib/auth.tsx`). Keys
+come from viem's `generatePrivateKey()` and are stored in `localStorage`. They are real secp256k1 keys,
+so SIWE logins, USDC payment authorisations and door challenges are verified exactly as they would be
+for any other wallet. **They are for demos only: never send real funds to them.**
 
----
+### Running with a local chain
+
+```bash
+# 1. Databases and a local chain
+docker compose up -d postgres redis
+docker run -d --name tixflow-anvil -p 8545:8545 ghcr.io/foundry-rs/foundry:stable "anvil --host 0.0.0.0 --block-time 1"
+
+# 2. Deploy the protocol (the keys below are Anvil's public development keys: local use only)
+cd src/contracts && sh script/install-deps.sh
+PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+MINTER_ADDRESS=0x70997970C51812dc3A010C7d01b50e0d17dc79C8 \
+VOUCHER_SIGNER_ADDRESS=0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC \
+forge script script/Deploy.s.sol:Deploy --rpc-url http://localhost:8545 --broadcast
+
+# 3. API with the chain workers (same Anvil development keys)
+cd ../backend/TixFlow/TixFlow.Api
+Chain__Enabled=true Chain__DeploymentsFile=../../../contracts/deployments/local.json \
+Chain__RelayerPrivateKey=0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
+Chain__VoucherSignerPrivateKey=0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a \
+Chain__Faucet__Enabled=true Indexer__ConfirmationBlocks=1 Database__MigrateOnStartup=true \
+dotnet run --launch-profile http
+
+# 4. Web app, then the end-to-end check that verifies every step on-chain
+cd ../../../frontend/web && npm install && npm run dev
+node scripts/e2e-chain.mjs
+```
 
 ## Tech stack
 
@@ -407,7 +464,7 @@ Workers (`TixFlow.Workers/appsettings.json`): `Mint:RpcUrl`, `Mint:PrivateKey`, 
 dotnet test src/backend/TixFlow/TixFlow.Tests
 ```
 
-These 36 tests cover SIWE auth, the queue and admission gate, checkout, minting, the indexer (including reorgs and stuck transactions) and redemption. They use an in-memory database and an in-memory queue store, so no Docker is needed.
+These 85 tests cover SIWE auth (including smart-wallet signatures), the queue and admission gate, checkout, both mint paths, vouchers, the Merkle tree, the indexer (reorgs, stuck transactions, every log type) and redemption. One of them proves checkout succeeds while the configured chain is unreachable. They use an in-memory database and an in-memory queue store, so no Docker is needed.
 
 ### Load test (k6)
 
@@ -427,8 +484,29 @@ Latest results ([`loadtest/results.md`](loadtest/results.md)): 1,000 of 1,000 re
 
 ```bash
 cd src/contracts
-forge test
+sh script/install-deps.sh                      # forge-std and OpenZeppelin v5.4.0 into ./lib
+forge test                                     # 135 unit, fuzz and invariant tests
+forge coverage --no-match-coverage '(test|script|mocks)/'
+forge snapshot --check --no-match-test 'testFuzz|invariant|test_Fork'
+BASE_SEPOLIA_RPC_URL=https://sepolia.base.org forge test --match-contract BaseSepoliaFork
 ```
+
+| Suite | What it covers |
+|-------|----------------|
+| Unit (121 tests) | Every function and every revert path of all six contracts |
+| Fuzz (9 properties, 512 runs each; 2,000 in CI) | Per-wallet limit and supply cap never exceeded; voucher replay, tampering, wrong key and expiry always fail; resale price never above the cap; refund equals payment |
+| Invariant (5 properties, 64 runs x 48 calls) | Minted never exceeds supply; escrow balance equals unsettled sales; redeemed tickets never move; marketplace stays solvent |
+| Fork (3 tests) | Gasless purchase, refund and release against the real USDC contract on Base Sepolia |
+
+Coverage of `src/` (mocks excluded): **100% of lines (399/399), 100% of functions (62/62),
+99.6% of statements, 98.1% of branches (106/108)**. Gas per test is pinned in
+[`.gas-snapshot`](src/contracts/.gas-snapshot). Slither runs in CI with **0 findings**; the triage of
+every finding it originally raised is in [THREAT_MODEL.md](THREAT_MODEL.md#4-static-analysis-slither).
+
+| Operation | Gas |
+|-----------|-----|
+| Create an event (EIP-1167 clone, 3 tiers, wiring) | 760,233 |
+| Deploy the full `EventTicket` bytecode instead | 3,905,812 |
 
 ---
 

@@ -3,8 +3,10 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Nethereum.Hex.HexConvertors.Extensions;
 using Nethereum.Signer;
 using TixFlow.Domain.Entities;
+using TixFlow.Infrastructure.Chain;
 using TixFlow.Infrastructure.Data;
 
 namespace TixFlow.Api.Auth;
@@ -14,12 +16,18 @@ public class SiweService
     private readonly NonceStore _nonceStore;
     private readonly TixFlowDbContext _db;
     private readonly IConfiguration _config;
+    private readonly ISmartWalletSignatureVerifier _smartWallets;
 
-    public SiweService(NonceStore nonceStore, TixFlowDbContext db, IConfiguration config)
+    public SiweService(
+        NonceStore nonceStore,
+        TixFlowDbContext db,
+        IConfiguration config,
+        ISmartWalletSignatureVerifier smartWallets)
     {
         _nonceStore = nonceStore;
         _db = db;
         _config = config;
+        _smartWallets = smartWallets;
     }
 
     public string GenerateNonce() => _nonceStore.Generate();
@@ -33,18 +41,7 @@ public class SiweService
         if (!_nonceStore.Validate(parsed.Nonce))
             return null;
 
-        string recoveredAddress;
-        try
-        {
-            var signer = new EthereumMessageSigner();
-            recoveredAddress = signer.EncodeUTF8AndEcRecover(message, signature);
-        }
-        catch
-        {
-            return null;
-        }
-
-        if (!string.Equals(recoveredAddress, parsed.Address, StringComparison.OrdinalIgnoreCase))
+        if (!await IsValidSignatureAsync(message, signature, parsed.Address))
             return null;
 
         var normalizedAddress = parsed.Address.ToLowerInvariant();
@@ -63,6 +60,41 @@ public class SiweService
         }
 
         return GenerateJwt(user);
+    }
+
+    /// <summary>
+    /// Accepts an EOA signature (checked offline with ecrecover) or, when a chain is configured, a smart-wallet
+    /// signature: ERC-1271 for deployed wallets and ERC-6492 for counterfactual ones such as Coinbase Smart Wallet.
+    /// </summary>
+    private async Task<bool> IsValidSignatureAsync(string message, string signature, string claimedAddress)
+    {
+        var signer = new EthereumMessageSigner();
+        try
+        {
+            var recovered = signer.EncodeUTF8AndEcRecover(message, signature);
+            if (string.Equals(recovered, claimedAddress, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        catch
+        {
+            // Not a 65-byte ECDSA signature; it may still be a contract-wallet signature.
+        }
+
+        if (!_smartWallets.IsAvailable)
+            return false;
+
+        byte[] signatureBytes;
+        try
+        {
+            signatureBytes = signature.HexToByteArray();
+        }
+        catch
+        {
+            return false;
+        }
+
+        var hash = signer.HashPrefixedMessage(Encoding.UTF8.GetBytes(message));
+        return await _smartWallets.IsValidAsync(claimedAddress, hash, signatureBytes);
     }
 
     private string GenerateJwt(User user)

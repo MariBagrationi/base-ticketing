@@ -1,0 +1,7 @@
+# Shell scripts and Dockerfiles run inside Linux containers, where CRLF line endings break them.
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.Dockerfile text eol=lf
+*.sol text eol=lf
+*.toml text eol=lf
+*.yml text eol=lf

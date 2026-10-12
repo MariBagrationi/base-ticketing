@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
-
-type Health = Awaited<ReturnType<typeof api.getChainHealth>>;
+import { api, type ChainHealth } from "@/lib/api";
+import { useChain } from "@/lib/chain";
 
 export function ChainHealthBanner() {
-  const [health, setHealth] = useState<Health | null>(null);
+  const { chainName } = useChain();
+  const [health, setHealth] = useState<ChainHealth | null>(null);
   const [offline, setOffline] = useState(false);
 
   useEffect(() => {
@@ -19,7 +19,7 @@ export function ChainHealthBanner() {
         })
         .catch(() => setOffline(true));
     check();
-    const id = setInterval(check, 20000);
+    const id = setInterval(check, 5000);
     return () => clearInterval(id);
   }, []);
 
@@ -30,7 +30,7 @@ export function ChainHealthBanner() {
       </Strip>
     );
   }
-  if (!health || health.status === "Healthy") return null;
+  if (!health) return null;
 
   if (health.status === "Simulated") {
     return (
@@ -40,9 +40,26 @@ export function ChainHealthBanner() {
     );
   }
 
+  if (health.status === "Healthy") {
+    return (
+      <Strip className="bg-success-soft text-success" dot="bg-success">
+        <strong className="font-semibold">{chainName || "Chain"} connected</strong>
+        {health.headBlock != null && <> · block {health.headBlock.toLocaleString()}</>}
+        {!!health.pendingMints && (
+          <>
+            {" "}
+            · {health.pendingMints} mint{health.pendingMints === 1 ? "" : "s"} in progress
+          </>
+        )}
+      </Strip>
+    );
+  }
+
   return (
     <Strip className="bg-warning-soft text-warning" dot="bg-warning animate-pulse">
-      {health.message}
+      <strong className="font-semibold">Chain unreachable.</strong> Checkout still works: purchases are saved and minted
+      automatically when it returns.
+      {!!health.pendingMints && <> {health.pendingMints} waiting.</>}
     </Strip>
   );
 }

@@ -28,6 +28,12 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(o => o.CreatedAt)
             .IsRequired();
 
+        builder.Property(o => o.PaymentNonce)
+            .HasMaxLength(66);
+
+        builder.Property(o => o.PaymentSignature)
+            .HasMaxLength(132);
+
         builder.HasOne(o => o.Buyer)
             .WithMany(u => u.Orders)
             .HasForeignKey(o => o.BuyerId)

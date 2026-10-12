@@ -1,35 +1,37 @@
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Nethereum.Web3;
+using Nethereum.RPC.Eth.DTOs;
+using TixFlow.Infrastructure.Chain;
 
 namespace TixFlow.Workers.Contract;
 
+/// <summary>
+/// Hands out transaction nonces for the relayer account. Exactly one process may own that account:
+/// two writers would hand out the same nonce and one of the transactions would be dropped.
+/// </summary>
 public class NonceService : INonceService
 {
     private long _currentNonce;
     private bool _initialized;
-    private readonly string _rpcUrl;
-    private readonly string _accountAddress;
+    private readonly IChainRpc _rpc;
     private readonly ILogger<NonceService> _logger;
 
-    public NonceService(IOptions<MintOptions> options, ILogger<NonceService> logger)
+    public NonceService(IChainRpc rpc, ILogger<NonceService> logger)
     {
+        _rpc = rpc;
         _logger = logger;
-        var opts = options.Value;
-        _rpcUrl = opts.RpcUrl;
-        var account = new Nethereum.Web3.Accounts.Account(opts.PrivateKey);
-        _accountAddress = account.Address;
     }
 
     public async Task InitializeAsync()
     {
-        var web3 = new Web3(_rpcUrl);
-        var pendingNonce = await web3.Eth.Transactions.GetTransactionCount
-            .SendRequestAsync(_accountAddress, Nethereum.RPC.Eth.DTOs.BlockParameter.CreatePending());
+        var address = _rpc.RelayerAddress
+            ?? throw new InvalidOperationException("Chain:RelayerPrivateKey is not configured.");
 
-        _currentNonce = (long)pendingNonce.Value;
+        var pendingNonce = await _rpc.ExecuteAsync(web3 =>
+            web3.Eth.Transactions.GetTransactionCount.SendRequestAsync(address, BlockParameter.CreatePending()));
+
+        Interlocked.Exchange(ref _currentNonce, (long)pendingNonce.Value);
         _initialized = true;
-        _logger.LogInformation("Nonce initialized to {Nonce} for {Address}", _currentNonce, _accountAddress);
+        _logger.LogInformation("Nonce set to {Nonce} for relayer {Address}", _currentNonce, address);
     }
 
     public long GetNextNonce()

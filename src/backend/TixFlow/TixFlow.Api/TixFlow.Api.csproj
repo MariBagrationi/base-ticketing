@@ -20,6 +20,7 @@
   <ItemGroup>
     <ProjectReference Include="..\TixFlow.Domain\TixFlow.Domain.csproj" />
     <ProjectReference Include="..\TixFlow.Infrastructure\TixFlow.Infrastructure.csproj" />
+    <ProjectReference Include="..\TixFlow.Workers\TixFlow.Workers.csproj" />
   </ItemGroup>
 
 </Project>

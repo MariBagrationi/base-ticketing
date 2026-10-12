@@ -71,6 +71,9 @@ function defaultLabel(count: number) {
 async function signIn(wallet: DemoWallet): Promise<string> {
   const account = privateKeyToAccount(wallet.privateKey);
   const { nonce } = await api.getNonce();
+  // Sign in on the chain the backend actually uses; Base mainnet when it runs without one.
+  const chain = await api.getChainConfig().catch(() => null);
+  const chainId = chain?.enabled ? chain.chainId : 8453;
   const message = [
     `${window.location.host} wants you to sign in with your Ethereum account:`,
     account.address,
@@ -79,7 +82,7 @@ async function signIn(wallet: DemoWallet): Promise<string> {
     "",
     `URI: ${window.location.origin}`,
     "Version: 1",
-    "Chain ID: 8453",
+    `Chain ID: ${chainId}`,
     `Nonce: ${nonce}`,
     `Issued At: ${new Date().toISOString()}`,
   ].join("\n");

@@ -13,6 +13,13 @@ public class Ticket
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? RedeemedAt { get; set; }
 
+    /// <summary>When the door redemption was included in an on-chain Merkle checkpoint.</summary>
+    public DateTimeOffset? CheckpointedAt { get; set; }
+    /// <summary>When the soulbound attendance badge was claimed on-chain (Redeemed log indexed).</summary>
+    public DateTimeOffset? BadgeClaimedAt { get; set; }
+    /// <summary>When the escrow refunded this ticket after its event was cancelled.</summary>
+    public DateTimeOffset? RefundedAt { get; set; }
+
     public Order Order { get; set; } = null!;
     public TicketTier TicketTier { get; set; } = null!;
     public User Owner { get; set; } = null!;

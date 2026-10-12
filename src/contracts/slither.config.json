@@ -1,0 +1,5 @@
+{
+  "filter_paths": "lib/|test/|script/|src/mocks/",
+  "detectors_to_exclude": "timestamp,calls-loop,costly-loop",
+  "exclude_dependencies": true
+}

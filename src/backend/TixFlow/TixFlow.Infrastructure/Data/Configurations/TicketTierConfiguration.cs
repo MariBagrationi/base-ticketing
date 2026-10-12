@@ -20,6 +20,11 @@ public class TicketTierConfiguration : IEntityTypeConfiguration<TicketTier>
         builder.Property(t => t.TotalSupply)
             .IsRequired();
 
+        builder.Property(t => t.MaxPerWallet)
+            .HasDefaultValue(TicketTier.DefaultMaxPerWallet);
+
+        builder.HasIndex(t => new { t.EventId, t.OnChainTierId });
+
         builder.HasOne(t => t.Event)
             .WithMany(e => e.TicketTiers)
             .HasForeignKey(t => t.EventId)

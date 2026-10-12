@@ -24,21 +24,28 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}, retried = false): Promise<T> {
+interface RequestOptions extends RequestInit {
+  /** Send this token instead of the active wallet's. */
+  token?: string;
+}
+
+async function request<T>(path: string, options: RequestOptions = {}, retried = false): Promise<T> {
+  const { token, ...init } = options;
+  const bearer = token ?? authToken;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...(options.headers as Record<string, string>),
+    ...(init.headers as Record<string, string>),
   };
-  if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+  if (bearer) headers["Authorization"] = `Bearer ${bearer}`;
 
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+    res = await fetch(`${API_BASE}${path}`, { ...init, headers });
   } catch {
     throw new ApiError(0, "Can't reach the TixFlow server. Check that the API is running on " + API_BASE + ".");
   }
 
-  if (res.status === 401 && authToken && reauthenticate && !retried) {
+  if (res.status === 401 && !token && authToken && reauthenticate && !retried) {
     const fresh = await reauthenticate();
     if (fresh) return request<T>(path, options, true);
   }
@@ -66,6 +73,8 @@ function fallbackMessage(status: number) {
   }
 }
 
+let chainConfigPromise: Promise<ChainConfig> | null = null;
+
 export const api = {
   getNonce: () => request<{ nonce: string }>("/auth/nonce"),
 
@@ -80,6 +89,8 @@ export const api = {
   getEvents: () => request<EventSummary[]>("/events"),
 
   getEvent: (id: string) => request<EventDetail>(`/events/${id}`),
+
+  getEventActivity: (id: string) => request<ChainActivity[]>(`/events/${id}/activity`),
 
   createEvent: (data: CreateEventPayload) =>
     request<{ id: string; name: string }>("/events", {
@@ -108,16 +119,31 @@ export const api = {
       headers: { "X-Admission-Token": admissionToken },
     }),
 
-  confirm: (orderId: string) =>
-    request<{ orderId: string; mintJobsCreated: number }>("/checkout/confirm", {
+  confirm: (orderId: string, payment?: PaymentAuthorization) =>
+    request<{ orderId: string; mintJobsCreated: number; paidOnChain: boolean }>("/checkout/confirm", {
       method: "POST",
-      body: JSON.stringify({ orderId, txHash: "0x" + "0".repeat(64) }),
+      body: JSON.stringify({ orderId, payment }),
     }),
 
-  getTickets: () => request<TicketSummary[]>("/tickets"),
+  getTickets: (token?: string) => request<TicketSummary[]>("/tickets", { token }),
 
-  getChainHealth: () =>
-    request<{ status: "Healthy" | "Simulated" | "Degraded"; message: string }>("/health/chain"),
+  getVoucher: (orderId: string) => request<VoucherResponse>(`/orders/${orderId}/voucher`),
+
+  getAttendanceProof: (ticketId: string) =>
+    request<{ ticketContract: string; tokenId: string; root: string; proof: `0x${string}`[]; alreadyClaimed: boolean }>(
+      `/tickets/${ticketId}/attendance-proof`
+    ),
+
+  getChainHealth: () => request<ChainHealth>("/health/chain"),
+
+  /** Fetched once per page load; a failed request is retried on the next call. */
+  getChainConfig: () => {
+    chainConfigPromise ??= request<ChainConfig>("/chain/config").catch((err) => {
+      chainConfigPromise = null;
+      throw err;
+    });
+    return chainConfigPromise;
+  },
 
   requestChallenge: (ticketId: string) =>
     request<{ ticketId: string; challenge: string; expiresInSeconds: number }>(
@@ -132,15 +158,73 @@ export const api = {
     }),
 };
 
+export interface ChainHealth {
+  status: "Healthy" | "Simulated" | "Degraded";
+  message: string;
+  chainId?: number;
+  headBlock?: number | null;
+  pendingMints?: number;
+}
+
+export type ChainConfig =
+  | { enabled: false }
+  | {
+      enabled: true;
+      chainId: number;
+      rpcUrl: string;
+      explorerUrl: string | null;
+      contracts: {
+        ticketFactory: `0x${string}`;
+        eventEscrow: `0x${string}`;
+        priceCappedResale: `0x${string}`;
+        usdc: `0x${string}`;
+        signatureValidator: `0x${string}`;
+      };
+      voucherSigner: string;
+      faucetEnabled: boolean;
+    };
+
+export type EnabledChainConfig = Extract<ChainConfig, { enabled: true }>;
+
+/** EIP-3009 receiveWithAuthorization parameters signed by the buyer. */
+export interface PaymentAuthorization {
+  validAfter: number;
+  validBefore: number;
+  nonce: `0x${string}`;
+  signature: `0x${string}`;
+}
+
+export interface VoucherResponse {
+  chainId: number;
+  ticketContract: `0x${string}`;
+  escrow: `0x${string}`;
+  usdc: `0x${string}`;
+  voucher: { buyer: `0x${string}`; tierId: string; quantity: string; nonce: string; deadline: string };
+  signature: `0x${string}`;
+  unitPrice: string;
+  payment: { validAfter: string; validBefore: string; nonce: `0x${string}`; signature: `0x${string}` } | null;
+}
+
+export interface ChainActivity {
+  kind: string;
+  summary: string;
+  txHash: string;
+  blockNumber: number;
+  contractAddress: string;
+  createdAt: string;
+}
+
 export interface TierSummary {
   id: string;
   name: string;
   priceUsdc: number;
   totalSupply: number;
+  maxPerWallet: number;
   ticketsSold: number;
 }
 
 export interface TierDetail extends TierSummary {
+  onChainTierId: number;
   redeemedCount: number;
 }
 
@@ -150,11 +234,19 @@ export interface EventSummary {
   description: string;
   venueName: string;
   startsAt: string;
+  endsAt: string;
   organizerId: string;
+  contractAddress: `0x${string}` | null;
+  cancelledAt: string | null;
   tiers: TierSummary[];
 }
 
 export interface EventDetail extends Omit<EventSummary, "tiers"> {
+  organizerWallet: string;
+  deployTxHash: string | null;
+  cancelRequestedAt: string | null;
+  cancelTxHash: string | null;
+  escrowReleasedAt: string | null;
   tiers: TierDetail[];
 }
 
@@ -172,9 +264,17 @@ export interface TicketSummary {
   eventId: string;
   venueName: string;
   startsAt: string;
+  contractAddress: `0x${string}` | null;
+  eventCancelledAt: string | null;
   orderStatus: "Pending" | "Confirmed" | string;
+  paidOnChain: boolean;
   mintTxHash: string | null;
+  mintStatus: "Pending" | "Submitted" | "Confirmed" | "Failed" | null;
+  mintError: string | null;
   redeemedAt: string | null;
+  checkpointedAt: string | null;
+  badgeClaimedAt: string | null;
+  refundedAt: string | null;
   createdAt: string;
 }
 
@@ -183,5 +283,6 @@ export interface CreateEventPayload {
   description: string;
   venueName: string;
   startsAt: string;
-  tiers: { name: string; priceUsdc: number; totalSupply: number }[];
+  endsAt?: string;
+  tiers: { name: string; priceUsdc: number; totalSupply: number; maxPerWallet?: number }[];
 }

@@ -25,8 +25,19 @@ public class EventConfiguration : IEntityTypeConfiguration<Event>
         builder.Property(e => e.StartsAt)
             .IsRequired();
 
+        builder.Property(e => e.EndsAt)
+            .IsRequired();
+
         builder.Property(e => e.ContractAddress)
             .HasMaxLength(42);
+
+        builder.HasIndex(e => e.ContractAddress);
+
+        builder.Property(e => e.DeployTxHash)
+            .HasMaxLength(66);
+
+        builder.Property(e => e.CancelTxHash)
+            .HasMaxLength(66);
 
         builder.HasOne(e => e.Organizer)
             .WithMany(u => u.OrganizedEvents)

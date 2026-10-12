@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { formatUsdcUnits, usdcBalance, useChain } from "@/lib/chain";
 import { shortAddress } from "@/lib/format";
 import { Avatar, Button, CheckIcon, Spinner, inputClass } from "./ui";
 import { useToast } from "./Toaster";
@@ -13,6 +14,21 @@ export function WalletMenu() {
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
+  const { config, client } = useChain();
+  const [balance, setBalance] = useState<bigint | null>(null);
+
+  // Read straight from the token contract whenever the menu is opened.
+  useEffect(() => {
+    if (!open || !config || !client || !wallet) return;
+    let cancelled = false;
+    setBalance(null);
+    usdcBalance(config, client, wallet.address)
+      .then((b) => !cancelled && setBalance(b))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [open, config, client, wallet]);
 
   useEffect(() => {
     if (!open) return;
@@ -96,6 +112,11 @@ export function WalletMenu() {
                 >
                   {shortAddress(wallet.address)} · copy
                 </button>
+                {config && (
+                  <p className="mt-0.5 text-xs tabular-nums text-muted">
+                    {balance === null ? "reading balance…" : `${formatUsdcUnits(balance)} USDC on-chain`}
+                  </p>
+                )}
               </div>
             </div>
             {status === "error" && (

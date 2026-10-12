@@ -4,10 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import * as signalR from "@microsoft/signalr";
-import { API_BASE, ApiError, api, getToken, type EventDetail } from "@/lib/api";
+import { API_BASE, ApiError, api, getToken, type ChainActivity, type EventDetail } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { dateParts, formatUsdc } from "@/lib/format";
 import { admissionKey } from "@/lib/admission";
+import { formatUsdcUnits, readEscrow, useChain } from "@/lib/chain";
+import { ExplorerLink } from "@/components/OnChain";
 import {
   ArrowLeftIcon,
   Badge,
@@ -104,13 +106,97 @@ export default function EventPage() {
               );
             })}
           </div>
+
+          <OnChainPanel event={event} />
         </div>
 
         <aside className="lg:sticky lg:top-24">
-          <PurchasePanel eventId={eventId} soldOut={event.tiers.every((t) => t.totalSupply - t.ticketsSold <= 0)} />
+          {event.cancelledAt || event.cancelRequestedAt ? (
+            <Notice tone="danger" title="This event was cancelled">
+              Tickets paid through the escrow are refunded automatically. Holders can also claim their refund
+              directly from the escrow contract.
+            </Notice>
+          ) : (
+            <PurchasePanel eventId={eventId} soldOut={event.tiers.every((t) => t.totalSupply - t.ticketsSold <= 0)} />
+          )}
         </aside>
       </div>
     </div>
+  );
+}
+
+/** What the chain itself says about this event: contract, escrowed funds and indexed transactions. */
+function OnChainPanel({ event }: { event: EventDetail }) {
+  const { config, client, chainName, loaded } = useChain();
+  const [activity, setActivity] = useState<ChainActivity[]>([]);
+  const [held, setHeld] = useState<bigint | null>(null);
+  const contract = event.contractAddress;
+
+  useEffect(() => {
+    if (!config) return;
+    let cancelled = false;
+    const load = () => {
+      api.getEventActivity(event.id).then((a) => !cancelled && setActivity(a)).catch(() => {});
+      if (client && contract) {
+        readEscrow(config, client, contract).then((e) => !cancelled && setHeld(e.held)).catch(() => {});
+      }
+    };
+    load();
+    const id = setInterval(load, 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [config, client, contract, event.id]);
+
+  if (!loaded || !config) return null;
+
+  return (
+    <section className="mt-10">
+      <h2 className="mb-3 font-display text-lg font-bold">On-chain</h2>
+      <Card className="divide-y divide-border">
+        <dl className="grid gap-x-6 gap-y-4 p-5 text-sm sm:grid-cols-3">
+          <div>
+            <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">Network</dt>
+            <dd className="mt-1 font-medium">{chainName}</dd>
+          </div>
+          <div>
+            <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">Ticket contract</dt>
+            <dd className="mt-1">
+              {contract ? (
+                <ExplorerLink kind="address" value={contract} />
+              ) : (
+                <span className="inline-flex items-center gap-2 text-muted">
+                  <Spinner className="h-3 w-3" /> deploying…
+                </span>
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">Held in escrow</dt>
+            <dd className="mt-1 font-medium tabular-nums">
+              {held === null ? "—" : `${formatUsdcUnits(held)} USDC`}
+              <span className="ml-1 text-xs font-normal text-muted">read from chain</span>
+            </dd>
+          </div>
+        </dl>
+
+        {activity.length === 0 ? (
+          <p className="p-5 text-sm text-muted">No transactions yet. Purchases, check-ins and refunds for this event appear here.</p>
+        ) : (
+          <ul className="max-h-80 divide-y divide-border overflow-y-auto">
+            {activity.map((a) => (
+              <li key={a.txHash + a.summary} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-5 py-3 text-sm">
+                <span className="min-w-0">{a.summary}</span>
+                <span className="shrink-0 text-xs text-muted">
+                  block {a.blockNumber} · <ExplorerLink kind="tx" value={a.txHash} />
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+    </section>
   );
 }
 

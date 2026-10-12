@@ -59,3 +59,7 @@ dist/
 *~
 .DS_Store
 Thumbs.db
+
+# ── Foundry artifacts ────────────────────────────────
+src/contracts/broadcast/
+src/contracts/deployments/local.json

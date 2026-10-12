@@ -32,12 +32,28 @@ public static class TicketEndpoints
                     EventId = t.TicketTier.Event.Id,
                     t.TicketTier.Event.VenueName,
                     t.TicketTier.Event.StartsAt,
+                    // On-chain facts a holder can verify independently of this API.
+                    t.TicketTier.Event.ContractAddress,
+                    EventCancelledAt = t.TicketTier.Event.CancelledAt,
                     OrderStatus = t.Order.Status.ToString(),
+                    PaidOnChain = t.Order.PaymentSignature != null,
                     MintTxHash = t.MintJobs
                         .OrderByDescending(j => j.CreatedAt)
                         .Select(j => j.TxHash)
                         .FirstOrDefault(),
+                    MintStatus = t.MintJobs
+                        .OrderByDescending(j => j.CreatedAt)
+                        .Select(j => j.Status.ToString())
+                        .FirstOrDefault(),
+                    MintError = t.MintJobs
+                        .Where(j => j.Status == Domain.Enums.MintJobStatus.Failed)
+                        .OrderByDescending(j => j.CreatedAt)
+                        .Select(j => j.LastError)
+                        .FirstOrDefault(),
                     t.RedeemedAt,
+                    t.CheckpointedAt,
+                    t.BadgeClaimedAt,
+                    t.RefundedAt,
                     t.CreatedAt
                 })
                 .ToListAsync();

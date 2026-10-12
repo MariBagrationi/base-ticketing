@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    name: Contracts (build, test, gas, coverage)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/contracts
+    env:
+      FOUNDRY_PROFILE: ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+      - name: Install Solidity dependencies
+        run: sh script/install-deps.sh
+      - name: Build and check contract sizes
+        run: forge build --sizes
+      - name: Unit, fuzz and invariant tests
+        run: forge test -vv
+      - name: Gas snapshot has not regressed
+        run: forge snapshot --check --tolerance 5 --no-match-test 'testFuzz|invariant|test_Fork'
+      - name: Coverage
+        run: forge coverage --no-match-coverage '(test|script|mocks)/' --report summary
+
+  contracts-fork:
+    name: Contracts (Base Sepolia fork, real USDC)
+    runs-on: ubuntu-latest
+    # Depends on a public RPC endpoint, so it reports but does not block.
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: src/contracts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+      - run: sh script/install-deps.sh
+      - run: forge test --match-contract BaseSepoliaFork -vv
+        env:
+          BASE_SEPOLIA_RPC_URL: ${{ secrets.BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org' }}
+
+  slither:
+    name: Slither static analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+      - name: Build with build-info
+        working-directory: src/contracts
+        run: |
+          sh script/install-deps.sh
+          forge build --build-info --skip test --skip script
+      - uses: crytic/slither-action@v0.4.0
+        with:
+          target: src/contracts
+          slither-config: src/contracts/slither.config.json
+          ignore-compile: true
+          # Every finding is either fixed or annotated in the source; see THREAT_MODEL.md.
+          fail-on: low
+
+  backend:
+    name: Backend (.NET tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet test src/backend/TixFlow/TixFlow.Tests --logger "console;verbosity=minimal"
+
+  frontend:
+    name: Frontend (type-check, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/frontend/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/frontend/web/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build

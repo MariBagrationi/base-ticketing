@@ -1,60 +1,78 @@
-using System.Reflection;
 using Microsoft.Extensions.Options;
-using Nethereum.Contracts;
-using Nethereum.Hex.HexTypes;
-using Nethereum.RPC.Eth.DTOs;
-using Nethereum.Web3;
-using Nethereum.Web3.Accounts;
+using Nethereum.Hex.HexConvertors.Extensions;
+using Nethereum.Signer;
+using TixFlow.Infrastructure.Chain;
+using TixFlow.Infrastructure.Contracts.EventTicket.ContractDefinition;
+using Escrow = TixFlow.Infrastructure.Contracts.EventEscrow.ContractDefinition;
 
 namespace TixFlow.Workers.Contract;
 
+/// <summary>Typed client for the two mint paths, built on the generated contract bindings.</summary>
 public class ContractMintClient : IContractMintClient
 {
-    private readonly Nethereum.Contracts.Contract _contract;
-    private readonly Account _account;
+    private readonly IRelayer _relayer;
+    private readonly IVoucherSigner _vouchers;
+    private readonly ChainOptions _options;
 
-    public ContractMintClient(IOptions<MintOptions> options)
+    public ContractMintClient(IRelayer relayer, IVoucherSigner vouchers, IOptions<ChainOptions> options)
     {
-        var opts = options.Value;
-        _account = new Account(opts.PrivateKey);
-        var web3 = new Web3(_account, opts.RpcUrl);
-
-        var abi = LoadEmbeddedAbi();
-        _contract = web3.Eth.GetContract(abi, opts.ContractAddress);
+        _relayer = relayer;
+        _vouchers = vouchers;
+        _options = options.Value;
     }
 
-    public async Task<string> MintAsync(string toAddress, long nonce)
+    public Task<SentTransaction> MintOrdersAsync(
+        string ticketContract, IReadOnlyList<MintOrderRequest> orders, CancellationToken ct = default)
     {
-        var function = _contract.GetFunction("mint");
-        var input = function.CreateTransactionInput(_account.Address, new HexBigInteger(0), null, toAddress);
-        input.Nonce = new HexBigInteger(nonce);
-
-        var txHash = await _contract.Eth.Transactions.SendRawTransaction
-            .SendRequestAsync(await _account.TransactionManager.SignTransactionAsync(input));
-
-        return txHash;
+        var function = new MintBatchFunction
+        {
+            Orders = orders.Select(o => new MintOrder
+            {
+                Buyer = o.Buyer,
+                TierId = o.TierId,
+                Quantity = o.Quantity,
+                Nonce = ChainIds.OrderNonce(o.OrderId)
+            }).ToList()
+        };
+        return _relayer.SendAsync(ticketContract, function, ct);
     }
 
-    public async Task<string> MintBatchAsync(string[] toAddresses, long nonce)
+    public Task<SentTransaction> PurchaseWithAuthorizationAsync(
+        string ticketContract, MintOrderRequest order, PaymentAuthorizationRequest payment, CancellationToken ct = default)
     {
-        var function = _contract.GetFunction("mintBatch");
-        var input = function.CreateTransactionInput(_account.Address, new HexBigInteger(0), null, new object[] { toAddresses });
-        input.Nonce = new HexBigInteger(nonce);
+        // The voucher is signed just before submission, so it cannot expire while the order waits for the chain.
+        var signed = _vouchers.Sign(ticketContract, order.Buyer, order.TierId, order.Quantity, order.OrderId);
+        var paymentSignature = EthECDSASignatureFactory.ExtractECDSASignature(payment.Signature);
 
-        var txHash = await _contract.Eth.Transactions.SendRawTransaction
-            .SendRequestAsync(await _account.TransactionManager.SignTransactionAsync(input));
-
-        return txHash;
+        var function = new Escrow.PurchaseWithAuthorizationFunction
+        {
+            Ticket = ticketContract,
+            Voucher = new Escrow.MintVoucher
+            {
+                Buyer = signed.Voucher.Buyer,
+                TierId = signed.Voucher.TierId,
+                Quantity = signed.Voucher.Quantity,
+                Nonce = signed.Voucher.Nonce,
+                Deadline = signed.Voucher.Deadline
+            },
+            VoucherSignature = signed.Signature.HexToByteArray(),
+            Auth = new Escrow.PaymentAuthorization
+            {
+                ValidAfter = payment.ValidAfter,
+                ValidBefore = payment.ValidBefore,
+                Nonce = payment.Nonce.HexToByteArray(),
+                V = paymentSignature.V[0],
+                R = paymentSignature.R,
+                S = paymentSignature.S
+            }
+        };
+        return _relayer.SendAsync(_options.Contracts.EventEscrow, function, ct);
     }
 
-    private static string LoadEmbeddedAbi()
-    {
-        var assembly = Assembly.GetExecutingAssembly();
-        var resourceName = assembly.GetManifestResourceNames()
-            .First(n => n.EndsWith("EventTicketAbi.json"));
-
-        using var stream = assembly.GetManifestResourceStream(resourceName)!;
-        using var reader = new StreamReader(stream);
-        return reader.ReadToEnd();
-    }
+    public Task<bool> IsOrderMintedAsync(string ticketContract, MintOrderRequest order) =>
+        _relayer.QueryAsync<NonceUsedFunction, bool>(ticketContract, new NonceUsedFunction
+        {
+            Buyer = order.Buyer,
+            Nonce = ChainIds.OrderNonce(order.OrderId)
+        });
 }

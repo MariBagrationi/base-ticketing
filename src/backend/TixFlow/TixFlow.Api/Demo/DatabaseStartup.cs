@@ -23,6 +23,6 @@ public static class DatabaseStartup
         }
 
         if (seed)
-            await DemoEventSeeder.SeedAsync(db, logger);
+            await DemoEventSeeder.SeedAsync(db, logger, app.Configuration["Demo:OrganizerWallet"]);
     }
 }

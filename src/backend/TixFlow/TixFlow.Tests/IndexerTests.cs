@@ -10,6 +10,7 @@ using Nethereum.Signer;
 using Nethereum.Web3;
 using TixFlow.Domain.Entities;
 using TixFlow.Domain.Enums;
+using TixFlow.Infrastructure.Chain;
 using TixFlow.Infrastructure.Data;
 using TixFlow.Workers.Contract;
 using TixFlow.Workers.Indexer;
@@ -118,7 +119,6 @@ public class IndexerTests : IClassFixture<TixFlowWebFactory>
         });
         var mintOptions = Options.Create(new MintOptions
         {
-            ContractAddress = "0x0000000000000000000000000000000000000001",
             MaxAttempts = 3
         });
 
@@ -127,6 +127,7 @@ public class IndexerTests : IClassFixture<TixFlowWebFactory>
             fakeWeb3,
             indexerOptions,
             mintOptions,
+            Options.Create(new ChainOptions()),
             NullLogger<ChainIndexer>.Instance);
 
         var reorged = await indexer.DetectAndHandleReorgAsync(db, checkpoint, CancellationToken.None);
@@ -170,7 +171,6 @@ public class IndexerTests : IClassFixture<TixFlowWebFactory>
         });
         var mintOptions = Options.Create(new MintOptions
         {
-            ContractAddress = "0x0000000000000000000000000000000000000001"
         });
 
         var indexer = new ChainIndexer(
@@ -178,6 +178,7 @@ public class IndexerTests : IClassFixture<TixFlowWebFactory>
             fakeWeb3,
             indexerOptions,
             mintOptions,
+            Options.Create(new ChainOptions()),
             NullLogger<ChainIndexer>.Instance);
 
         var reorged = await indexer.DetectAndHandleReorgAsync(db, checkpoint, CancellationToken.None);
@@ -261,7 +262,6 @@ public class IndexerTests : IClassFixture<TixFlowWebFactory>
         var indexerOptions = Options.Create(new IndexerOptions { StuckTxTimeoutMinutes = 5 });
         var mintOptions = Options.Create(new MintOptions
         {
-            ContractAddress = "0x0000000000000000000000000000000000000001",
             MaxAttempts = 3
         });
 
@@ -270,6 +270,7 @@ public class IndexerTests : IClassFixture<TixFlowWebFactory>
             new FakeWeb3Provider(blockHash: "0x", blockNumber: 0),
             indexerOptions,
             mintOptions,
+            Options.Create(new ChainOptions()),
             NullLogger<ChainIndexer>.Instance);
 
         await indexer.HandleStuckTransactionsAsync(db, CancellationToken.None);
@@ -357,7 +358,6 @@ public class IndexerTests : IClassFixture<TixFlowWebFactory>
         var indexerOptions = Options.Create(new IndexerOptions { StuckTxTimeoutMinutes = 5 });
         var mintOptions = Options.Create(new MintOptions
         {
-            ContractAddress = "0x0000000000000000000000000000000000000001",
             MaxAttempts = 3
         });
 
@@ -366,6 +366,7 @@ public class IndexerTests : IClassFixture<TixFlowWebFactory>
             new FakeWeb3Provider(blockHash: "0x", blockNumber: 0),
             indexerOptions,
             mintOptions,
+            Options.Create(new ChainOptions()),
             NullLogger<ChainIndexer>.Instance);
 
         await indexer.HandleStuckTransactionsAsync(db, CancellationToken.None);

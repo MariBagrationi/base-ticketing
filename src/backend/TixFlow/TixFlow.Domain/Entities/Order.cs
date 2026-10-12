@@ -13,6 +13,15 @@ public class Order
     public string IdempotencyKey { get; set; } = string.Empty;
     public DateTimeOffset CreatedAt { get; set; }
 
+    // Buyer-signed EIP-3009 authorisation to pull the order total into escrow. Stored at confirm time and
+    // relayed on-chain later by the mint worker, so checkout never waits for the chain.
+    public long? PaymentValidAfter { get; set; }
+    public long? PaymentValidBefore { get; set; }
+    public string? PaymentNonce { get; set; }
+    public string? PaymentSignature { get; set; }
+
+    public bool HasPaymentAuthorization => PaymentSignature is not null;
+
     public User Buyer { get; set; } = null!;
     public Event Event { get; set; } = null!;
     public TicketTier TicketTier { get; set; } = null!;

@@ -91,7 +91,8 @@ public class MintTests : IClassFixture<TixFlowWebFactory>
             Name = "Test Event",
             OrganizerId = user.Id,
             StartsAt = DateTimeOffset.UtcNow.AddDays(30),
-            VenueName = "Test Venue"
+            VenueName = "Test Venue",
+            ContractAddress = FakeMintClient.TicketContract
         };
         db.Events.Add(evt);
 
@@ -143,7 +144,6 @@ public class MintTests : IClassFixture<TixFlowWebFactory>
         await db.SaveChangesAsync();
 
         var fakeMintClient = new FakeMintClient();
-        var fakeNonceService = new FakeNonceService();
         var options = Options.Create(new MintOptions
         {
             PollIntervalSeconds = 1,
@@ -154,7 +154,6 @@ public class MintTests : IClassFixture<TixFlowWebFactory>
         var worker = new MintWorker(
             _factory.Services.GetRequiredService<IServiceScopeFactory>(),
             fakeMintClient,
-            fakeNonceService,
             options,
             NullLogger<MintWorker>.Instance);
 
@@ -197,7 +196,8 @@ public class MintTests : IClassFixture<TixFlowWebFactory>
             Name = "Fail Event",
             OrganizerId = user.Id,
             StartsAt = DateTimeOffset.UtcNow.AddDays(30),
-            VenueName = "Fail Venue"
+            VenueName = "Fail Venue",
+            ContractAddress = FakeMintClient.TicketContract
         };
         db.Events.Add(evt);
 
@@ -248,7 +248,6 @@ public class MintTests : IClassFixture<TixFlowWebFactory>
         await db.SaveChangesAsync();
 
         var failingClient = new FakeMintClient { ShouldFail = true };
-        var fakeNonceService = new FakeNonceService();
         var options = Options.Create(new MintOptions
         {
             PollIntervalSeconds = 1,
@@ -259,7 +258,6 @@ public class MintTests : IClassFixture<TixFlowWebFactory>
         var worker = new MintWorker(
             _factory.Services.GetRequiredService<IServiceScopeFactory>(),
             failingClient,
-            fakeNonceService,
             options,
             NullLogger<MintWorker>.Instance);
 
@@ -385,23 +383,45 @@ public class MintTests : IClassFixture<TixFlowWebFactory>
 
 public class FakeMintClient : IContractMintClient
 {
+    public const string TicketContract = "0x00000000000000000000000000000000000000aa";
+
     public int SingleCalls;
     public int BatchCalls;
     public bool ShouldFail;
+    public Exception? FailWith;
+    public bool AlreadyMinted;
+    public List<MintOrderRequest> MintedOrders { get; } = [];
+    public List<(MintOrderRequest Order, PaymentAuthorizationRequest Payment)> Purchases { get; } = [];
+    private long _nonce;
 
-    public Task<string> MintAsync(string toAddress, long nonce)
+    public Task<SentTransaction> MintOrdersAsync(
+        string ticketContract, IReadOnlyList<MintOrderRequest> orders, CancellationToken ct = default)
     {
-        if (ShouldFail) throw new Exception("RPC error: simulated failure");
-        Interlocked.Increment(ref SingleCalls);
-        return Task.FromResult("0x" + Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N"));
-    }
-
-    public Task<string> MintBatchAsync(string[] toAddresses, long nonce)
-    {
-        if (ShouldFail) throw new Exception("RPC error: simulated failure");
+        ThrowIfFailing();
         Interlocked.Increment(ref BatchCalls);
-        return Task.FromResult("0x" + Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N"));
+        MintedOrders.AddRange(orders);
+        return Task.FromResult(NewTransaction());
     }
+
+    public Task<SentTransaction> PurchaseWithAuthorizationAsync(
+        string ticketContract, MintOrderRequest order, PaymentAuthorizationRequest payment, CancellationToken ct = default)
+    {
+        ThrowIfFailing();
+        Interlocked.Increment(ref SingleCalls);
+        Purchases.Add((order, payment));
+        return Task.FromResult(NewTransaction());
+    }
+
+    public Task<bool> IsOrderMintedAsync(string ticketContract, MintOrderRequest order) => Task.FromResult(AlreadyMinted);
+
+    private void ThrowIfFailing()
+    {
+        if (FailWith is not null) throw FailWith;
+        if (ShouldFail) throw new Exception("RPC error: simulated failure");
+    }
+
+    private SentTransaction NewTransaction() =>
+        new("0x" + Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N"), Interlocked.Increment(ref _nonce) - 1);
 }
 
 public class FakeNonceService : INonceService

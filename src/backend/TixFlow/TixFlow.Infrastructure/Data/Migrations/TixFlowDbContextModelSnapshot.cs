@@ -22,20 +22,93 @@ namespace TixFlow.Infrastructure.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("TixFlow.Domain.Entities.ChainActivity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("BlockNumber")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ContractAddress")
+                        .IsRequired()
+                        .HasMaxLength(42)
+                        .HasColumnType("character varying(42)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<int>("LogIndex")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("TxHash")
+                        .IsRequired()
+                        .HasMaxLength(66)
+                        .HasColumnType("character varying(66)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventId", "BlockNumber");
+
+                    b.HasIndex("TxHash", "LogIndex")
+                        .IsUnique();
+
+                    b.ToTable("ChainActivities");
+                });
+
             modelBuilder.Entity("TixFlow.Domain.Entities.Event", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("CancelRequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CancelTxHash")
+                        .HasMaxLength(66)
+                        .HasColumnType("character varying(66)");
+
+                    b.Property<DateTimeOffset?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("ContractAddress")
                         .HasMaxLength(42)
                         .HasColumnType("character varying(42)");
+
+                    b.Property<DateTimeOffset?>("DeploySubmittedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeployTxHash")
+                        .HasMaxLength(66)
+                        .HasColumnType("character varying(66)");
 
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
+
+                    b.Property<DateTimeOffset>("EndsAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("EscrowReleasedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -55,6 +128,8 @@ namespace TixFlow.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ContractAddress");
+
                     b.HasIndex("OrganizerId");
 
                     b.ToTable("Events");
@@ -72,8 +147,14 @@ namespace TixFlow.Infrastructure.Data.Migrations
                         .HasMaxLength(66)
                         .HasColumnType("character varying(66)");
 
+                    b.Property<long>("ChainHeadBlock")
+                        .HasColumnType("bigint");
+
                     b.Property<long>("LastProcessedBlock")
                         .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("LastRpcSuccessAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -146,6 +227,20 @@ namespace TixFlow.Infrastructure.Data.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<string>("PaymentNonce")
+                        .HasMaxLength(66)
+                        .HasColumnType("character varying(66)");
+
+                    b.Property<string>("PaymentSignature")
+                        .HasMaxLength(132)
+                        .HasColumnType("character varying(132)");
+
+                    b.Property<long?>("PaymentValidAfter")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("PaymentValidBefore")
+                        .HasColumnType("bigint");
+
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
 
@@ -171,11 +266,51 @@ namespace TixFlow.Infrastructure.Data.Migrations
                     b.ToTable("Orders");
                 });
 
+            modelBuilder.Entity("TixFlow.Domain.Entities.RedemptionCheckpoint", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Count")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Root")
+                        .IsRequired()
+                        .HasMaxLength(66)
+                        .HasColumnType("character varying(66)");
+
+                    b.Property<string>("TxHash")
+                        .HasMaxLength(66)
+                        .HasColumnType("character varying(66)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventId", "CreatedAt");
+
+                    b.ToTable("RedemptionCheckpoints");
+                });
+
             modelBuilder.Entity("TixFlow.Domain.Entities.Ticket", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("BadgeClaimedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("CheckpointedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -187,6 +322,9 @@ namespace TixFlow.Infrastructure.Data.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset?>("RedeemedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("RefundedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Status")
@@ -220,10 +358,18 @@ namespace TixFlow.Infrastructure.Data.Migrations
                     b.Property<Guid>("EventId")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("MaxPerWallet")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(4);
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<int>("OnChainTierId")
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("PriceUsdc")
                         .HasPrecision(18, 6)
@@ -234,7 +380,7 @@ namespace TixFlow.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("EventId");
+                    b.HasIndex("EventId", "OnChainTierId");
 
                     b.ToTable("TicketTiers");
                 });
@@ -251,6 +397,9 @@ namespace TixFlow.Infrastructure.Data.Migrations
                     b.Property<string>("Email")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
+
+                    b.Property<DateTimeOffset?>("FaucetFundedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("WalletAddress")
                         .IsRequired()
@@ -312,6 +461,17 @@ namespace TixFlow.Infrastructure.Data.Migrations
                     b.Navigation("Event");
 
                     b.Navigation("TicketTier");
+                });
+
+            modelBuilder.Entity("TixFlow.Domain.Entities.RedemptionCheckpoint", b =>
+                {
+                    b.HasOne("TixFlow.Domain.Entities.Event", "Event")
+                        .WithMany()
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Event");
                 });
 
             modelBuilder.Entity("TixFlow.Domain.Entities.Ticket", b =>
