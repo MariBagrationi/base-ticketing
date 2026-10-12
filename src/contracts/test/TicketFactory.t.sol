@@ -106,10 +106,15 @@ contract TicketFactoryTest is BaseTest {
         factory.createEvent(p);
         uint256 cloneGas = before - gasleft();
 
+        // Deployed with a raw CREATE so the measurement is the real cost of putting the bytecode on-chain.
+        bytes memory creationCode = type(EventTicket).creationCode;
+        address fullDeployment;
         before = gasleft();
-        EventTicket fullDeployment = new EventTicket();
+        assembly ("memory-safe") {
+            fullDeployment := create(0, add(creationCode, 0x20), mload(creationCode))
+        }
         uint256 implementationGas = before - gasleft();
-        assertTrue(address(fullDeployment) != address(0));
+        assertTrue(fullDeployment != address(0));
 
         // A non-clone design pays the bytecode deployment for every event on top of initialisation.
         uint256 fullDeployGas = implementationGas + cloneGas;
