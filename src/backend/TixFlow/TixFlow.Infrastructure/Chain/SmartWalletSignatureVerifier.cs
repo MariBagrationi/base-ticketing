@@ -55,10 +55,3 @@ public class SmartWalletSignatureVerifier : ISmartWalletSignatureVerifier
         }
     }
 }
-
-public class NoSmartWalletSignatureVerifier : ISmartWalletSignatureVerifier
-{
-    public bool IsAvailable => false;
-
-    public Task<bool> IsValidAsync(string signer, byte[] hash, byte[] signature) => Task.FromResult(false);
-}

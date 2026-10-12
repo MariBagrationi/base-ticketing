@@ -1,0 +1,3 @@
+# Nethereum-generated contract bindings: do not report nullable or style warnings for them.
+[*.gen.cs]
+generated_code = true

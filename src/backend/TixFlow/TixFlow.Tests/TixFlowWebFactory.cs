@@ -32,7 +32,6 @@ public class TixFlowWebFactory : WebApplicationFactory<Program>
                 ["Queue:DefaultBatchSize"] = "3",
                 ["Queue:DefaultIntervalSeconds"] = "1",
                 ["Queue:AdmissionTokenTtlMinutes"] = "5",
-                ["Queue:PositionBroadcastIntervalSeconds"] = "5",
                 ["ConnectionStrings:Redis"] = "localhost:6379",
                 ["Demo:SimulateMint"] = "false",
                 ["Demo:SeedEvents"] = "false"
