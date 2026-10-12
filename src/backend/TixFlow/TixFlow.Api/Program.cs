@@ -1,9 +1,11 @@
+using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using StackExchange.Redis;
+using TixFlow.Api.Admin;
 using TixFlow.Api.Auth;
 using TixFlow.Api.Checkout;
 using TixFlow.Api.Demo;
@@ -31,6 +33,7 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 // Auth services
 builder.Services.AddSingleton<NonceStore>();
 builder.Services.AddScoped<SiweService>();
+builder.Services.AddScoped<RoleService>();
 
 // Queue services
 builder.Services.Configure<QueueOptions>(builder.Configuration.GetSection(QueueOptions.SectionName));
@@ -85,7 +88,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)),
+            RoleClaimType = Policies.RoleClaim
         };
 
         options.Events = new JwtBearerEvents
@@ -98,18 +102,35 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                     context.Token = accessToken;
                 return Task.CompletedTask;
             },
-            // A token can outlive its user (e.g. after a database reset); reject it so the client signs in again.
+            // Roles are loaded from the database on every request, never trusted from the token, so a
+            // revoked role stops working immediately. A token whose user no longer exists (e.g. after a
+            // database reset) is rejected so the client signs in again.
             OnTokenValidated = async context =>
             {
                 var sub = context.Principal?.FindFirst("sub")?.Value;
                 var db = context.HttpContext.RequestServices.GetRequiredService<TixFlowDbContext>();
-                if (!Guid.TryParse(sub, out var userId) || !await db.Users.AnyAsync(u => u.Id == userId))
+                var account = Guid.TryParse(sub, out var userId)
+                    ? await db.Users
+                        .Where(u => u.Id == userId)
+                        .Select(u => new { Roles = u.Roles.Select(r => r.Role).ToList() })
+                        .FirstOrDefaultAsync()
+                    : null;
+
+                if (account is null || context.Principal?.Identity is not ClaimsIdentity identity)
+                {
                     context.Fail("User no longer exists.");
+                    return;
+                }
+
+                foreach (var stale in identity.FindAll(Policies.RoleClaim).ToList())
+                    identity.RemoveClaim(stale);
+                foreach (var role in account.Roles)
+                    identity.AddClaim(new Claim(Policies.RoleClaim, role.ToString()));
             }
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options => options.AddTixFlowPolicies());
 
 // Rate limiting
 builder.Services.AddRateLimiter(options =>
@@ -130,6 +151,13 @@ builder.Services.AddRateLimiter(options =>
 });
 
 var app = builder.Build();
+
+// One-shot mode for the migrator container: migrate, seed, and exit without serving requests.
+if (args.Contains("--migrate-and-seed"))
+{
+    await app.InitializeDatabaseAsync(force: true);
+    return;
+}
 
 await app.InitializeDatabaseAsync();
 
@@ -152,6 +180,8 @@ app.MapTicketEndpoints();
 app.MapRedeemEndpoints();
 app.MapHealthEndpoints();
 app.MapChainEndpoints();
+app.MapAdminEndpoints();
+app.MapDemoEndpoints();
 app.MapHub<QueueHub>("/hubs/queue");
 
 app.Run();

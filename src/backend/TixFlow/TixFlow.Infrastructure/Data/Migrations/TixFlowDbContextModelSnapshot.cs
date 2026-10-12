@@ -22,6 +22,46 @@ namespace TixFlow.Infrastructure.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("TixFlow.Domain.Entities.AuditLog", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActorWallet")
+                        .IsRequired()
+                        .HasMaxLength(42)
+                        .HasColumnType("character varying(42)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Details")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Target")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.ToTable("AuditLogs");
+                });
+
             modelBuilder.Entity("TixFlow.Domain.Entities.ChainActivity", b =>
                 {
                     b.Property<long>("Id")
@@ -300,6 +340,24 @@ namespace TixFlow.Infrastructure.Data.Migrations
                     b.ToTable("RedemptionCheckpoints");
                 });
 
+            modelBuilder.Entity("TixFlow.Domain.Entities.StaffAssignment", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("UserId", "EventId");
+
+                    b.HasIndex("EventId");
+
+                    b.ToTable("StaffAssignments");
+                });
+
             modelBuilder.Entity("TixFlow.Domain.Entities.Ticket", b =>
                 {
                     b.Property<Guid>("Id")
@@ -401,6 +459,9 @@ namespace TixFlow.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset?>("FaucetFundedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset?>("FirstLoginAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("WalletAddress")
                         .IsRequired()
                         .HasMaxLength(42)
@@ -412,6 +473,23 @@ namespace TixFlow.Infrastructure.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("TixFlow.Domain.Entities.UserRole", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Role")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset>("GrantedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("UserId", "Role");
+
+                    b.ToTable("UserRoles");
                 });
 
             modelBuilder.Entity("TixFlow.Domain.Entities.Event", b =>
@@ -474,6 +552,25 @@ namespace TixFlow.Infrastructure.Data.Migrations
                     b.Navigation("Event");
                 });
 
+            modelBuilder.Entity("TixFlow.Domain.Entities.StaffAssignment", b =>
+                {
+                    b.HasOne("TixFlow.Domain.Entities.Event", "Event")
+                        .WithMany()
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TixFlow.Domain.Entities.User", "User")
+                        .WithMany("StaffAssignments")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Event");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("TixFlow.Domain.Entities.Ticket", b =>
                 {
                     b.HasOne("TixFlow.Domain.Entities.Order", "Order")
@@ -512,6 +609,17 @@ namespace TixFlow.Infrastructure.Data.Migrations
                     b.Navigation("Event");
                 });
 
+            modelBuilder.Entity("TixFlow.Domain.Entities.UserRole", b =>
+                {
+                    b.HasOne("TixFlow.Domain.Entities.User", "User")
+                        .WithMany("Roles")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("TixFlow.Domain.Entities.Event", b =>
                 {
                     b.Navigation("Orders");
@@ -543,6 +651,10 @@ namespace TixFlow.Infrastructure.Data.Migrations
                     b.Navigation("OrganizedEvents");
 
                     b.Navigation("OwnedTickets");
+
+                    b.Navigation("Roles");
+
+                    b.Navigation("StaffAssignments");
                 });
 #pragma warning restore 612, 618
         }

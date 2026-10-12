@@ -453,7 +453,7 @@ public class IndexerTests : IClassFixture<TixFlowWebFactory>
     }
 
     [Fact]
-    public async Task GetTicket_OtherUser_Returns404()
+    public async Task GetTicket_OtherUser_Returns403()
     {
         var (client1, userId1) = await CreateAuthenticatedClientWithUserId();
 
@@ -526,7 +526,7 @@ public class IndexerTests : IClassFixture<TixFlowWebFactory>
         await db.SaveChangesAsync();
 
         var response = await client1.GetAsync($"/tickets/{ticketId}");
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]

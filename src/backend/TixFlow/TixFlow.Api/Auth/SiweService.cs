@@ -17,17 +17,20 @@ public class SiweService
     private readonly TixFlowDbContext _db;
     private readonly IConfiguration _config;
     private readonly ISmartWalletSignatureVerifier _smartWallets;
+    private readonly RoleService _roles;
 
     public SiweService(
         NonceStore nonceStore,
         TixFlowDbContext db,
         IConfiguration config,
-        ISmartWalletSignatureVerifier smartWallets)
+        ISmartWalletSignatureVerifier smartWallets,
+        RoleService roles)
     {
         _nonceStore = nonceStore;
         _db = db;
         _config = config;
         _smartWallets = smartWallets;
+        _roles = roles;
     }
 
     public string GenerateNonce() => _nonceStore.Generate();
@@ -56,10 +59,16 @@ public class SiweService
                 CreatedAt = DateTimeOffset.UtcNow
             };
             _db.Users.Add(user);
-            await _db.SaveChangesAsync();
         }
 
-        return GenerateJwt(user);
+        // A wallet gets the default User role the first time it signs in, whether its row was just created
+        // or already existed (pre-provisioned staff, or a resale buyer the indexer recorded).
+        var firstLogin = user.FirstLoginAt is null;
+        user.FirstLoginAt ??= DateTimeOffset.UtcNow;
+        var hasRoles = await _db.UserRoles.AnyAsync(r => r.UserId == user.Id);
+        var roles = await _roles.EnsureLoginRolesAsync(user, isNewUser: firstLogin && !hasRoles);
+
+        return GenerateJwt(user, roles);
     }
 
     /// <summary>
@@ -97,18 +106,21 @@ public class SiweService
         return await _smartWallets.IsValidAsync(claimedAddress, hash, signatureBytes);
     }
 
-    private string GenerateJwt(User user)
+    private string GenerateJwt(User user, IEnumerable<Domain.Enums.Role> roles)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var expiryHours = int.Parse(_config["Jwt:ExpiryHours"] ?? "24");
 
-        var claims = new[]
+        // Role claims describe the roles at sign-in for clients. The API itself re-reads roles from the
+        // database on every request, so a revoked role stops working immediately.
+        var claims = new List<Claim>
         {
-            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new Claim("wallet", user.WalletAddress),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new("wallet", user.WalletAddress),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
+        claims.AddRange(roles.Select(r => new Claim(Policies.RoleClaim, r.ToString())));
 
         var token = new JwtSecurityToken(
             issuer: _config["Jwt:Issuer"],

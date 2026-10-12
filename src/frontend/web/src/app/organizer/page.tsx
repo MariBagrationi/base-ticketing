@@ -5,11 +5,21 @@ import Link from "next/link";
 import { api, type EventDetail } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { dateParts, formatUsdc } from "@/lib/format";
-import { Button, Card, EmptyState, Field, Notice, PageHeader, PageSpinner, TicketIcon, inputClass } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, Field, Notice, PageHeader, PageSpinner, TicketIcon, inputClass } from "@/components/ui";
+import { ExplorerLink } from "@/components/OnChain";
+import { RoleGate } from "@/components/RoleGate";
 import { useToast } from "@/components/Toaster";
 
 export default function OrganizerPage() {
-  const { status, userId, wallet, createWallet } = useAuth();
+  return (
+    <RoleGate need="admin">
+      <OrganizerDashboard />
+    </RoleGate>
+  );
+}
+
+function OrganizerDashboard() {
+  const { status, userId, wallet } = useAuth();
   const toast = useToast();
   const [events, setEvents] = useState<EventDetail[] | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -35,28 +45,16 @@ export default function OrganizerPage() {
     return () => clearInterval(id);
   }, [status, load]);
 
-  if (status === "no-wallet") {
-    return (
-      <Shell>
-        <PageHeader eyebrow="Organizer" title="Host an event" />
-        <EmptyState
-          icon={<TicketIcon />}
-          title="Create an organizer wallet"
-          description="Events belong to the wallet that creates them. You can keep separate wallets for organizing and buying."
-          action={
-            <Button
-              onClick={() => {
-                createWallet("Organizer");
-                toast({ tone: "success", title: "Organizer wallet created" });
-              }}
-            >
-              Create organizer wallet
-            </Button>
-          }
-        />
-      </Shell>
-    );
-  }
+  const cancel = async (event: EventDetail) => {
+    if (!confirm(`Cancel “${event.name}”? Sales stop immediately and every ticket paid through the escrow is refunded. This cannot be undone.`)) return;
+    try {
+      const result = await api.cancelEvent(event.id);
+      toast({ tone: "success", title: "Event cancelled", description: result.message });
+      load();
+    } catch (err) {
+      toast({ tone: "error", title: "Couldn't cancel the event", description: err instanceof Error ? err.message : undefined });
+    }
+  };
 
   if (status !== "ready" || (events === null && !error)) return <PageSpinner />;
 
@@ -95,7 +93,7 @@ export default function OrganizerPage() {
         />
       ) : (
         <div className="space-y-6">
-          {events?.map((evt) => <EventStats key={evt.id} event={evt} />)}
+          {events?.map((evt) => <EventStats key={evt.id} event={evt} onCancel={() => cancel(evt)} />)}
         </div>
       )}
 
@@ -112,8 +110,9 @@ function BuyerTip() {
   );
 }
 
-function EventStats({ event }: { event: EventDetail }) {
+function EventStats({ event, onCancel }: { event: EventDetail; onCancel: () => void }) {
   const d = dateParts(event.startsAt);
+  const cancelled = !!(event.cancelledAt || event.cancelRequestedAt);
   const sold = event.tiers.reduce((s, t) => s + t.ticketsSold, 0);
   const supply = event.tiers.reduce((s, t) => s + t.totalSupply, 0);
   const redeemed = event.tiers.reduce((s, t) => s + t.redeemedCount, 0);
@@ -123,14 +122,29 @@ function EventStats({ event }: { event: EventDetail }) {
     <Card className="overflow-hidden">
       <div className="flex flex-wrap items-start justify-between gap-4 p-5 sm:p-6">
         <div className="min-w-0">
-          <h2 className="font-display text-xl font-bold">{event.name}</h2>
+          <h2 className="flex flex-wrap items-center gap-2 font-display text-xl font-bold">
+            {event.name}
+            {cancelled && <Badge tone="danger">{event.cancelledAt ? "Cancelled" : "Cancelling…"}</Badge>}
+          </h2>
           <p className="mt-1 text-sm text-muted">
             {event.venueName} · {d.weekday}, {d.month} {d.day} · {d.time}
           </p>
+          {event.contractAddress && (
+            <p className="mt-1 text-xs text-muted">
+              Ticket contract <ExplorerLink kind="address" value={event.contractAddress} />
+            </p>
+          )}
         </div>
-        <Link href={`/event/${event.id}`} className="text-sm font-medium text-accent hover:underline">
-          View public page →
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link href={`/event/${event.id}`} className="text-sm font-medium text-accent hover:underline">
+            View public page →
+          </Link>
+          {!cancelled && (
+            <Button size="sm" variant="ghost" className="hover:!text-danger" onClick={onCancel}>
+              Cancel event
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-px border-y border-border bg-border sm:grid-cols-3">

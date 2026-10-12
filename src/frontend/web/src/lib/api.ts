@@ -84,7 +84,7 @@ export const api = {
       body: JSON.stringify({ message, signature }),
     }),
 
-  getMe: () => request<{ userId: string; wallet: string }>("/auth/me"),
+  getMe: () => request<Me>("/auth/me"),
 
   getEvents: () => request<EventSummary[]>("/events"),
 
@@ -146,17 +146,89 @@ export const api = {
   },
 
   requestChallenge: (ticketId: string) =>
-    request<{ ticketId: string; challenge: string; expiresInSeconds: number }>(
+    request<{ ticketId: string; challenge: string; expiresInSeconds: number; eventName: string; tierName: string }>(
       `/redeem/${ticketId}/challenge`,
       { method: "POST" }
     ),
 
   confirmRedeem: (ticketId: string, challenge: string, signature: string) =>
-    request<{ success: boolean; ticketId: string; redeemedAt: string }>(`/redeem/${ticketId}/confirm`, {
+    request<{ success: boolean; ticketId: string; redeemedAt: string; eventName: string; tierName: string; checkedIn: number; sold: number }>(`/redeem/${ticketId}/confirm`, {
       method: "POST",
       body: JSON.stringify({ challenge, signature }),
     }),
+
+  // ----- staff ---------------------------------------------------------
+
+  getScannableEvents: () => request<{ scopedToAssignments: boolean; events: ScannableEvent[] }>("/redeem/events"),
+
+  // ----- admin ---------------------------------------------------------
+
+  getUsers: (search?: string) =>
+    request<AdminUser[]>(`/admin/users${search ? `?search=${encodeURIComponent(search)}` : ""}`),
+
+  grantRole: (wallet: string, role: Role) =>
+    request<{ message: string }>(`/admin/users/${wallet}/roles`, { method: "POST", body: JSON.stringify({ role }) }),
+
+  revokeRole: (wallet: string, role: Role) =>
+    request<{ message: string }>(`/admin/users/${wallet}/roles/${role}`, { method: "DELETE" }),
+
+  assignStaff: (eventId: string, wallet: string) =>
+    request<{ message: string }>(`/admin/events/${eventId}/staff/${wallet}`, { method: "PUT" }),
+
+  unassignStaff: (eventId: string, wallet: string) =>
+    request<{ message: string }>(`/admin/events/${eventId}/staff/${wallet}`, { method: "DELETE" }),
+
+  cancelEvent: (eventId: string) =>
+    request<{ message: string; settlesOnChain: boolean }>(`/admin/events/${eventId}/cancel`, { method: "POST" }),
+
+  getAuditLog: () => request<AuditEntry[]>("/admin/audit-log?limit=50"),
+
+  /** Pre-seeded Admin and Staff wallets. Empty unless the backend runs with Demo:ExposeAccounts. */
+  getDemoAccounts: () => request<DemoAccount[]>("/demo/accounts").catch(() => [] as DemoAccount[]),
 };
+
+export type Role = "User" | "Staff" | "Admin";
+
+export interface Me {
+  userId: string;
+  wallet: string;
+  roles: Role[];
+  staffEventIds: string[];
+}
+
+export interface DemoAccount {
+  label: string;
+  role: Role;
+  privateKey: `0x${string}`;
+}
+
+export interface ScannableEvent {
+  id: string;
+  name: string;
+  venueName: string;
+  startsAt: string;
+  sold: number;
+  checkedIn: number;
+}
+
+export interface AdminUser {
+  id: string;
+  wallet: string;
+  roles: Role[];
+  staffEventIds: string[];
+  createdAt: string;
+  hasSignedIn: boolean;
+  configuredAdmin: boolean;
+}
+
+export interface AuditEntry {
+  id: number;
+  actorWallet: string;
+  action: string;
+  target: string;
+  details: string | null;
+  createdAt: string;
+}
 
 export interface ChainHealth {
   status: "Healthy" | "Simulated" | "Degraded";

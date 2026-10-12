@@ -90,6 +90,29 @@ public static class TestSupport
         return (client, Guid.Parse(me!.UserId), key);
     }
 
+    /// <summary>Replaces a user's roles directly in the database. Roles are re-read on every request.</summary>
+    public static async Task SetRolesAsync(TixFlowWebFactory factory, Guid userId, params Role[] roles)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TixFlowDbContext>();
+        db.UserRoles.RemoveRange(db.UserRoles.Where(r => r.UserId == userId));
+        foreach (var role in roles)
+            db.UserRoles.Add(new UserRole { UserId = userId, Role = role, GrantedAt = DateTimeOffset.UtcNow });
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>Signs in a fresh wallet and gives it exactly the given roles.</summary>
+    public static async Task<(HttpClient Client, Guid UserId, EthECKey Key)> SignInAsAsync(
+        TixFlowWebFactory factory, params Role[] roles)
+    {
+        var session = await SignInAsync(factory);
+        await SetRolesAsync(factory, session.UserId, roles);
+        return session;
+    }
+
+    public static async Task<HttpClient> StaffClientAsync(TixFlowWebFactory factory) =>
+        (await SignInAsAsync(factory, Role.Staff)).Client;
+
     public static async Task<SeededEvent> SeedEventAsync(
         TixFlowWebFactory factory,
         string? contractAddress = null,

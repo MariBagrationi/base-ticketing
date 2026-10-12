@@ -2,17 +2,32 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/lib/auth";
 import { WalletMenu } from "./WalletMenu";
 
-const links = [
-  { href: "/", label: "Events", match: (p: string) => p === "/" || p.startsWith("/event") || p.startsWith("/checkout") },
-  { href: "/tickets", label: "My tickets", match: (p: string) => p.startsWith("/tickets") },
-  { href: "/scanner", label: "Door scanner", match: (p: string) => p.startsWith("/scanner") },
-  { href: "/organizer", label: "Organizer", match: (p: string) => p.startsWith("/organizer") },
+type Audience = "all" | "buyer" | "staff" | "admin";
+
+const links: { href: string; label: string; show: Audience; match: (p: string) => boolean }[] = [
+  { href: "/", label: "Events", show: "all", match: (p) => p === "/" || p.startsWith("/event") || p.startsWith("/checkout") },
+  { href: "/tickets", label: "My tickets", show: "buyer", match: (p) => p.startsWith("/tickets") },
+  { href: "/scanner", label: "Door scanner", show: "staff", match: (p) => p.startsWith("/scanner") },
+  { href: "/organizer", label: "Organizer", show: "admin", match: (p) => p.startsWith("/organizer") },
+  { href: "/admin", label: "Admin", show: "admin", match: (p) => p.startsWith("/admin") },
 ];
 
 export function Header() {
   const pathname = usePathname() ?? "/";
+  const { status, isAdmin, isStaff, isBuyer } = useAuth();
+
+  // Navigation follows the roles of the active wallet. Before sign-in only the buyer view is offered.
+  const signedIn = status === "ready";
+  const visible = links.filter(
+    (l) =>
+      l.show === "all" ||
+      (l.show === "buyer" && (!signedIn || isBuyer)) ||
+      (l.show === "staff" && signedIn && isStaff) ||
+      (l.show === "admin" && signedIn && isAdmin)
+  );
 
   return (
     <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 border-b border-border bg-background/85 backdrop-blur-md">
@@ -23,7 +38,7 @@ export function Header() {
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">
-          {links.map((l) => (
+          {visible.map((l) => (
             <NavLink key={l.href} href={l.href} active={l.match(pathname)}>
               {l.label}
             </NavLink>
@@ -36,7 +51,7 @@ export function Header() {
       </div>
 
       <nav className="flex gap-1 overflow-x-auto px-3 pb-2 md:hidden">
-        {links.map((l) => (
+        {visible.map((l) => (
           <NavLink key={l.href} href={l.href} active={l.match(pathname)}>
             {l.label}
           </NavLink>

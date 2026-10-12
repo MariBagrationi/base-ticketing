@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using TixFlow.Api.Auth;
 using TixFlow.Infrastructure.Data;
 
 namespace TixFlow.Api.Tickets;
@@ -66,13 +67,12 @@ public static class TicketEndpoints
             ClaimsPrincipal user,
             TixFlowDbContext db) =>
         {
-            var userId = Guid.Parse(user.FindFirstValue("sub")!);
-
             var ticket = await db.Tickets
-                .Where(t => t.Id == ticketId && t.OwnerId == userId)
+                .Where(t => t.Id == ticketId)
                 .Select(t => new
                 {
                     t.Id,
+                    t.OwnerId,
                     Status = t.Status.ToString(),
                     t.TokenId,
                     t.OrderId,
@@ -81,9 +81,14 @@ public static class TicketEndpoints
                 })
                 .FirstOrDefaultAsync();
 
-            return ticket is null
-                ? Results.NotFound(new { message = "Ticket not found." })
-                : Results.Ok(ticket);
+            if (ticket is null)
+                return Results.NotFound(new { message = "Ticket not found." });
+
+            // A role is not enough: a ticket can only be read by its owner, or by an admin.
+            if (ticket.OwnerId != user.UserId() && !user.IsAdmin())
+                return Results.Json(new { message = "This ticket belongs to another wallet." }, statusCode: 403);
+
+            return Results.Ok(new { ticket.Id, ticket.Status, ticket.TokenId, ticket.OrderId, ticket.TicketTierId, ticket.CreatedAt });
         });
     }
 }

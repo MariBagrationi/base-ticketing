@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Nethereum.Hex.HexConvertors.Extensions;
+using TixFlow.Api.Auth;
 using TixFlow.Domain.Enums;
 using TixFlow.Infrastructure.Chain;
 using TixFlow.Infrastructure.Data;
@@ -96,7 +97,7 @@ public static class ChainEndpoints
                     }
                     : null
             });
-        }).RequireAuthorization().WithTags("Chain");
+        }).RequireAuthorization(Policies.User).WithTags("Chain");
 
         // Merkle proof that a ticket was redeemed, against the root currently published on-chain.
         // Anyone holding it can call claimAttendanceBadge; the API is not needed to submit it.
@@ -112,7 +113,7 @@ public static class ChainEndpoints
 
             if (ticket is null)
                 return Results.NotFound(new { message = "Ticket not found." });
-            if (ticket.OwnerId != userId)
+            if (ticket.OwnerId != userId && !user.IsAdmin())
                 return Results.Json(new { message = "This ticket belongs to another wallet." }, statusCode: 403);
             if (ticket.TokenId is null || ticket.CheckpointedAt is null)
                 return Results.Conflict(new { message = "This ticket's redemption has not been checkpointed on-chain yet." });

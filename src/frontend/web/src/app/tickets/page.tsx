@@ -5,8 +5,17 @@ import { api, type TicketSummary } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { ButtonLink, EmptyState, Notice, PageHeader, PageSpinner, TicketIcon } from "@/components/ui";
 import { TicketPass } from "@/components/TicketPass";
+import { RoleGate } from "@/components/RoleGate";
 
 export default function TicketsPage() {
+  return (
+    <RoleGate need="buyer">
+      <Tickets />
+    </RoleGate>
+  );
+}
+
+function Tickets() {
   const { status, wallet } = useAuth();
   const [tickets, setTickets] = useState<TicketSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);

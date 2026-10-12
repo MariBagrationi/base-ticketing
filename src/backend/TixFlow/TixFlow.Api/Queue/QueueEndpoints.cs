@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.Extensions.Options;
+using TixFlow.Api.Auth;
 
 namespace TixFlow.Api.Queue;
 
@@ -7,7 +8,7 @@ public static class QueueEndpoints
 {
     public static void MapQueueEndpoints(this WebApplication app)
     {
-        var group = app.MapGroup("/queue").WithTags("Queue").RequireAuthorization();
+        var group = app.MapGroup("/queue").WithTags("Queue").RequireAuthorization(Policies.User);
 
         group.MapPost("/{eventId:guid}/join", async (
             Guid eventId,

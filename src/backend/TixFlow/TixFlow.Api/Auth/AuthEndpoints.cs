@@ -1,5 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using TixFlow.Infrastructure.Data;
 
 namespace TixFlow.Api.Auth;
 
@@ -27,11 +29,22 @@ public static class AuthEndpoints
             return Results.Ok(new { token });
         });
 
-        group.MapGet("/me", (ClaimsPrincipal user) =>
+        // Roles here are the live ones from the database, not the snapshot inside the token.
+        group.MapGet("/me", async (ClaimsPrincipal user, TixFlowDbContext db) =>
         {
-            var userId = user.FindFirstValue("sub");
-            var wallet = user.FindFirstValue("wallet");
-            return Results.Ok(new { userId, wallet });
+            var userId = user.UserId();
+            var staffEventIds = await db.StaffAssignments
+                .Where(a => a.UserId == userId)
+                .Select(a => a.EventId)
+                .ToListAsync();
+
+            return Results.Ok(new
+            {
+                userId,
+                wallet = user.Wallet(),
+                roles = user.Roles(),
+                staffEventIds
+            });
         }).RequireAuthorization();
     }
 }

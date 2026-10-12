@@ -6,9 +6,10 @@ import { formatUsdcUnits, usdcBalance, useChain } from "@/lib/chain";
 import { shortAddress } from "@/lib/format";
 import { Avatar, Button, CheckIcon, Spinner, inputClass } from "./ui";
 import { useToast } from "./Toaster";
+import { DemoAccounts, RoleBadge } from "./RoleGate";
 
 export function WalletMenu() {
-  const { wallet, wallets, status, error, createWallet, switchWallet, removeWallet, retry } = useAuth();
+  const { wallet, wallets, roles, status, error, createWallet, switchWallet, removeWallet, retry } = useAuth();
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [naming, setNaming] = useState(false);
@@ -119,6 +120,11 @@ export function WalletMenu() {
                 )}
               </div>
             </div>
+            {status === "ready" && (
+              <p className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-muted">
+                Roles: {roles.length === 0 ? "none" : roles.map((r) => <RoleBadge key={r} role={r} />)}
+              </p>
+            )}
             {status === "error" && (
               <div className="mt-3 rounded-lg bg-danger-soft p-2.5 text-xs text-danger">
                 {error}
@@ -187,6 +193,8 @@ export function WalletMenu() {
               Remove this wallet
             </button>
           </div>
+
+          <DemoAccounts className="border-t border-border p-3" />
 
           <p className="border-t border-border bg-surface-alt px-4 py-2.5 text-[11px] leading-relaxed text-muted">
             Demo wallets live in this browser only. Never send real funds to them.

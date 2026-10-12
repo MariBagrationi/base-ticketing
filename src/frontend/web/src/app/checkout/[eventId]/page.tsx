@@ -22,6 +22,7 @@ import {
 import { TicketPass } from "@/components/TicketPass";
 import { ExplorerLink } from "@/components/OnChain";
 import { useToast } from "@/components/Toaster";
+import { RoleGate } from "@/components/RoleGate";
 
 const MAX_QTY = 4;
 
@@ -35,6 +36,14 @@ type Step =
   | { phase: "error"; message: string; rejoin: boolean };
 
 export default function CheckoutPage() {
+  return (
+    <RoleGate need="buyer">
+      <Checkout />
+    </RoleGate>
+  );
+}
+
+function Checkout() {
   const { eventId } = useParams<{ eventId: string }>();
   const { status, wallet } = useAuth();
   const { config, client } = useChain();

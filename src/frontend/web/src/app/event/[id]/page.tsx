@@ -203,7 +203,7 @@ function OnChainPanel({ event }: { event: EventDetail }) {
 function PurchasePanel({ eventId, soldOut }: { eventId: string; soldOut: boolean }) {
   const router = useRouter();
   const toast = useToast();
-  const { status, error, createWallet, retry } = useAuth();
+  const { status, error, createWallet, retry, isBuyer } = useAuth();
   const [queue, setQueue] = useState<QueueState>({ phase: "checking" });
   const stopRef = useRef<() => void>(() => {});
 
@@ -280,7 +280,7 @@ function PurchasePanel({ eventId, soldOut }: { eventId: string; soldOut: boolean
   useEffect(() => {
     stopRef.current();
     setQueue({ phase: "checking" });
-    if (status !== "ready") return;
+    if (status !== "ready" || !isBuyer) return;
     let cancelled = false;
     (async () => {
       try {
@@ -302,7 +302,7 @@ function PurchasePanel({ eventId, soldOut }: { eventId: string; soldOut: boolean
     return () => {
       cancelled = true;
     };
-  }, [status, eventId, watch]);
+  }, [status, isBuyer, eventId, watch]);
 
   useEffect(() => {
     if (queue.phase !== "admitted") return;
@@ -346,6 +346,10 @@ function PurchasePanel({ eventId, soldOut }: { eventId: string; soldOut: boolean
         ) : status === "error" ? (
           <Notice title="Couldn't sign in" action={<Button size="sm" variant="secondary" onClick={retry}>Try again</Button>}>
             {error}
+          </Notice>
+        ) : !isBuyer ? (
+          <Notice tone="warning" title="This wallet can't buy tickets">
+            Door staff accounts are for scanning only. Switch to a buyer wallet from the menu in the top-right.
           </Notice>
         ) : queue.phase === "checking" ? (
           <Centered>

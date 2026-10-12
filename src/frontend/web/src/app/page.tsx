@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { dateParts, formatUsdc } from "@/lib/format";
 import { Badge, Button, ButtonLink, EmptyState, Notice, PageHeader, PageSpinner, TicketIcon } from "@/components/ui";
 import { useToast } from "@/components/Toaster";
+import { DemoAccounts } from "@/components/RoleGate";
 
 export default function Home() {
   const [events, setEvents] = useState<EventSummary[]>([]);
@@ -90,6 +91,7 @@ function Onboarding() {
           Create demo wallet
         </Button>
       </div>
+      <DemoAccounts className="border-t border-border bg-surface-alt/50 px-6 py-4 sm:px-8" />
     </section>
   );
 }

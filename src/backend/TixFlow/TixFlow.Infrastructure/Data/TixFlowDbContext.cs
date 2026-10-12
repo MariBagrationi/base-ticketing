@@ -16,6 +16,9 @@ public class TixFlowDbContext : DbContext
     public DbSet<IndexerCheckpoint> IndexerCheckpoints => Set<IndexerCheckpoint>();
     public DbSet<RedemptionCheckpoint> RedemptionCheckpoints => Set<RedemptionCheckpoint>();
     public DbSet<ChainActivity> ChainActivities => Set<ChainActivity>();
+    public DbSet<UserRole> UserRoles => Set<UserRole>();
+    public DbSet<StaffAssignment> StaffAssignments => Set<StaffAssignment>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

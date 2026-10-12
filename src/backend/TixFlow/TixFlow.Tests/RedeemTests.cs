@@ -151,7 +151,7 @@ public class RedeemTests : IClassFixture<TixFlowWebFactory>
     [Fact]
     public async Task Challenge_NonexistentTicket_Returns404()
     {
-        var client = _factory.CreateClient();
+        var client = await TestSupport.StaffClientAsync(_factory);
         var response = await client.PostAsync($"/redeem/{Guid.NewGuid()}/challenge", null);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -164,7 +164,7 @@ public class RedeemTests : IClassFixture<TixFlowWebFactory>
     private async Task<(HttpClient client, Guid ticketId)> SetupTicketWithStatus(
         TicketStatus status, string? walletAddress = null, long? tokenId = null)
     {
-        var client = _factory.CreateClient();
+        var client = await TestSupport.StaffClientAsync(_factory);
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<TixFlowDbContext>();

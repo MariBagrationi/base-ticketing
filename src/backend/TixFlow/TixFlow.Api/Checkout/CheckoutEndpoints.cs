@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using TixFlow.Api.Auth;
 using TixFlow.Api.Queue;
 using TixFlow.Domain.Entities;
 using TixFlow.Domain.Enums;
@@ -19,7 +20,7 @@ public static partial class CheckoutEndpoints
     // unreachable; on-chain settlement happens later, in the mint worker.
     public static void MapCheckoutEndpoints(this WebApplication app)
     {
-        var group = app.MapGroup("/checkout").WithTags("Checkout").RequireAuthorization();
+        var group = app.MapGroup("/checkout").WithTags("Checkout").RequireAuthorization(Policies.User);
 
         group.MapPost("/reserve", async (
             ClaimsPrincipal user,

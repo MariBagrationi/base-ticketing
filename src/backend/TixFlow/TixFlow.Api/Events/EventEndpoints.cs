@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using TixFlow.Api.Auth;
 using TixFlow.Domain.Entities;
 using TixFlow.Domain.Enums;
 using TixFlow.Infrastructure.Data;
@@ -135,7 +136,7 @@ public static class EventEndpoints
             await db.SaveChangesAsync();
 
             return Results.Created($"/events/{evt.Id}", new { evt.Id, evt.Name });
-        }).RequireAuthorization();
+        }).RequireAuthorization(Policies.Admin);
     }
 }
 

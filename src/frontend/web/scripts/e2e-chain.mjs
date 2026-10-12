@@ -1,13 +1,16 @@
 // End-to-end smoke test against a running stack with a chain enabled (e.g. `docker compose up`).
-// Plays an organizer and a buyer through the API, then verifies every result directly on-chain.
+// Plays an admin and a buyer through the API, then verifies every result directly on-chain.
 //
 //   node scripts/e2e-chain.mjs
-//   API_URL=http://localhost:5222 ORGANIZER_KEY=0x... node scripts/e2e-chain.mjs
+//   API_URL=http://localhost:5222 ADMIN_KEY=0x... node scripts/e2e-chain.mjs
+//
+// ADMIN_KEY must belong to a wallet listed in the API's Auth:AdminWallets. The default is Anvil's public
+// development account #3, which the local Docker stack configures as the demo admin. Local use only.
 import { createPublicClient, http, parseAbi, toHex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 
 const API = process.env.API_URL || "http://localhost:5222";
-const ORGANIZER_KEY = process.env.ORGANIZER_KEY || generatePrivateKey();
+const ADMIN_KEY = process.env.ADMIN_KEY || "0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6";
 const TIMEOUT_MS = Number(process.env.TIMEOUT_MS || 90_000);
 
 const ticketAbi = parseAbi([
@@ -105,16 +108,31 @@ async function main() {
   assert(BigInt(await chain.getChainId()) === BigInt(config.chainId), `RPC chain ID matches the API (${config.chainId})`);
   const { eventEscrow: escrow, usdc } = config.contracts;
 
-  const organizer = privateKeyToAccount(ORGANIZER_KEY);
+  const organizer = privateKeyToAccount(ADMIN_KEY);
   const buyer = privateKeyToAccount(generatePrivateKey());
-  console.log(`  organizer ${organizer.address}\n  buyer     ${buyer.address}`);
+  console.log(`  admin  ${organizer.address}\n  buyer  ${buyer.address}`);
 
   step("Signing in with Sign-In with Ethereum");
   const organizerToken = await signIn(organizer, config.chainId);
   const buyerToken = await signIn(buyer, config.chainId);
-  ok("organizer and buyer hold JWTs");
+  const adminRoles = (await api("/auth/me", { token: organizerToken })).roles;
+  assert(adminRoles.includes("Admin"), "the admin wallet has the Admin role (from Auth:AdminWallets)");
+  assert((await api("/auth/me", { token: buyerToken })).roles.join() === "User", "a new wallet gets only the User role");
 
-  step("Organizer creates an event; the factory deploys its ticket contract as a clone");
+  step("Role checks are enforced by the server");
+  const denied = async (label, call) => {
+    try {
+      await call();
+    } catch (err) {
+      return assert(err.status === 403, `${label} is refused with 403`);
+    }
+    throw new Error(`Assertion failed: ${label} should have been refused`);
+  };
+  await denied("a buyer creating an event", () => api("/events", { token: buyerToken, method: "POST", body: {} }));
+  await denied("a buyer listing users", () => api("/admin/users", { token: buyerToken }));
+  await denied("a buyer opening the scanner", () => api("/redeem/events", { token: buyerToken }));
+
+  step("Admin creates an event; the factory deploys its ticket contract as a clone");
   const starts = new Date(Date.now() + 14 * 864e5);
   const created = await api("/events", {
     token: organizerToken,
@@ -216,10 +234,11 @@ async function main() {
   const voucher = await api(`/orders/${orderId}/voucher`, { token: buyerToken });
   assert(voucher.ticketContract.toLowerCase() === ticket.toLowerCase() && voucher.voucher.quantity === String(quantity), "voucher covers the order");
 
-  step("Door: the holder signs a one-time challenge");
-  const { challenge } = await api(`/redeem/${first.id}/challenge`, { token: buyerToken, method: "POST" });
+  step("Door: staff scan the ticket and the holder signs a one-time challenge");
+  await denied("the buyer scanning their own ticket", () => api(`/redeem/${first.id}/challenge`, { token: buyerToken, method: "POST" }));
+  const { challenge } = await api(`/redeem/${first.id}/challenge`, { token: organizerToken, method: "POST" });
   const redeemed = await api(`/redeem/${first.id}/confirm`, {
-    token: buyerToken,
+    token: organizerToken,
     method: "POST",
     body: { challenge, signature: await buyer.signMessage({ message: challenge }) },
   });

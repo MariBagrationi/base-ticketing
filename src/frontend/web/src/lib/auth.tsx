@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { api, setReauthenticate, setToken } from "./api";
+import { api, setReauthenticate, setToken, type Role } from "./api";
 
 export interface DemoWallet {
   label: string;
@@ -25,13 +25,26 @@ interface AuthState {
   wallets: DemoWallet[];
   wallet: DemoWallet | null;
   userId: string | null;
+  /** Live roles from the server. They only drive what the UI shows; the API enforces them itself. */
+  roles: Role[];
+  staffEventIds: string[];
+  isAdmin: boolean;
+  /** Staff or Admin: may use the door scanner. */
+  isStaff: boolean;
+  /** User or Admin: may queue, buy and hold tickets. */
+  isBuyer: boolean;
   status: AuthStatus;
   isAuthed: boolean;
   error: string | null;
   createWallet: (label?: string) => DemoWallet;
+  /** Adds a wallet from an existing private key (demo accounts) and switches to it. */
+  importWallet: (label: string, privateKey: `0x${string}`) => DemoWallet;
   switchWallet: (address: string) => void;
   removeWallet: (address: string) => void;
   signMessage: (message: string) => Promise<string>;
+  /** Cached session token of any local wallet, if it has signed in before. */
+  tokenFor: (address: string) => string | null;
+  refreshRoles: () => Promise<void>;
   retry: () => void;
 }
 
@@ -63,9 +76,7 @@ function write(key: string, value: string | null) {
 }
 
 function defaultLabel(count: number) {
-  if (count === 0) return "Buyer";
-  if (count === 1) return "Organizer";
-  return `Wallet ${count + 1}`;
+  return count === 0 ? "Buyer" : `Wallet ${count + 1}`;
 }
 
 async function signIn(wallet: DemoWallet): Promise<string> {
@@ -97,6 +108,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [activeAddress, setActiveAddress] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [staffEventIds, setStaffEventIds] = useState<string[]>([]);
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -133,6 +146,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(null);
       setReauthenticate(null);
       setUserId(null);
+      setRoles([]);
+      setStaffEventIds([]);
       setStatus("no-wallet");
       return;
     }
@@ -152,6 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setStatus("signing-in");
       setError(null);
       setUserId(null);
+      setRoles([]);
       try {
         const cached = read(jwtKey(wallet.address));
         setToken(cached ?? (await signIn(wallet)));
@@ -159,6 +175,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const me = await api.getMe();
         if (cancelled) return;
         setUserId(me.userId);
+        setRoles(me.roles);
+        setStaffEventIds(me.staffEventIds);
         setStatus("ready");
       } catch (err) {
         if (cancelled) return;
@@ -176,14 +194,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const createWallet = useCallback(
     (label?: string) => {
       const privateKey = generatePrivateKey();
-      const account = privateKeyToAccount(privateKey);
       const created: DemoWallet = {
         label: label?.trim() || defaultLabel(walletsRef.current.length),
-        address: account.address,
+        address: privateKeyToAccount(privateKey).address,
         privateKey,
       };
       persist([...walletsRef.current, created], created.address);
       return created;
+    },
+    [persist]
+  );
+
+  const importWallet = useCallback(
+    (label: string, privateKey: `0x${string}`) => {
+      const address = privateKeyToAccount(privateKey).address;
+      const existing = walletsRef.current.find((w) => w.address === address);
+      if (existing) {
+        persist(walletsRef.current, address);
+        return existing;
+      }
+      const imported: DemoWallet = { label, address, privateKey };
+      persist([...walletsRef.current, imported], address);
+      return imported;
     },
     [persist]
   );
@@ -212,19 +244,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [wallet]
   );
 
+  const refreshRoles = useCallback(async () => {
+    const me = await api.getMe();
+    setRoles(me.roles);
+    setStaffEventIds(me.staffEventIds);
+  }, []);
+
+  const tokenFor = useCallback((address: string) => read(jwtKey(address)), []);
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
+  const isAdmin = roles.includes("Admin");
   const value: AuthState = {
     wallets,
     wallet,
     userId,
+    roles,
+    staffEventIds,
+    isAdmin,
+    isStaff: isAdmin || roles.includes("Staff"),
+    isBuyer: isAdmin || roles.includes("User"),
     status,
     isAuthed: status === "ready",
     error,
     createWallet,
+    importWallet,
     switchWallet,
     removeWallet,
     signMessage,
+    tokenFor,
+    refreshRoles,
     retry,
   };
 
