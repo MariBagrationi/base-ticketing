@@ -107,8 +107,9 @@ contract TicketFactoryTest is BaseTest {
         uint256 cloneGas = before - gasleft();
 
         before = gasleft();
-        new EventTicket();
+        EventTicket fullDeployment = new EventTicket();
         uint256 implementationGas = before - gasleft();
+        assertTrue(address(fullDeployment) != address(0));
 
         // A non-clone design pays the bytecode deployment for every event on top of initialisation.
         uint256 fullDeployGas = implementationGas + cloneGas;
